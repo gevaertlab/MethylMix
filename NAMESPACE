@@ -1,0 +1,2 @@
+import(foreach,parallel,doParallel,RColorBrewer,optimx,RPMM)
+export(MethylMix,MethylMix_PlotModel)

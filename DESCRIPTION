@@ -1,0 +1,25 @@
+Package: MethylMix
+Version: 0.99.1
+Date: 2014-08-25
+Type: Package
+Title: MethylMix: Identifying methylation driven cancer genes.
+Author: Olivier Gevaert
+Maintainer: Olivier Gevaert <olivier.gevaert@gmail.com>
+Description: MethylMix is an algorithm implemented to identify hyper
+        and hypomethylated genes for a disease. MethylMix is based on a
+        beta mixture model to identify methylation states and compares
+        them with the normal DNA methylation state. MethylMix uses a
+        novel statistic, the Differential Methylation value or DM-value
+        defined as the difference of a methylation state with the
+        normal methylation state. Finally, matched gene expression data
+        is used to identify, besides differential, functional
+        methylation states by focusing on methylation changes that
+        effect gene expression.
+License: GPL-2
+LazyLoad: yes
+Depends: R (>= 3.1.1)
+Imports: foreach,parallel,doParallel,RColorBrewer,optimx,RPMM
+biocViews:
+        DNAMethylation,StatisticalMethod,DifferentialMethylation,GeneRegulation,GeneExpression,MethylationArray,
+        DifferentialExpression, Pathways, Network
+Suggests: BiocStyle
