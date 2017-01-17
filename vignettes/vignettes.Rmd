@@ -1,0 +1,263 @@
+---
+title: "MethylMix"
+subtitle: "An R package for identifying DNA methylation driven genes"
+author: |
+    | Olivier Gevaert
+    |
+    | Stanford Center for Biomedical Informatics
+    | Department of Medicine
+    | 1265 Welch Road
+    | Stanford CA, 94305-5479
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MethylMix}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+##1. Getting started
+
+__Installing the package.__ To install the _MethylMix_ package, the easiest way is through bioconductor:
+
+```{r, eval=FALSE}
+source("http://bioconductor.org/biocLite.R")
+biocLite(MethylMix)
+```
+
+Other ways to install MethylMix is to first download the appropriate file for 
+your platform from the Bioconductor website [http://www.bioconductor.org/](http://www.bioconductor.org/). 
+For Windows, start R and select the `Packages` menu, then `Install package from local zip file`.
+Find and highlight the location of the zip file and click on `open`. For Linux/Unix, use the usual command 
+`R CMD INSTALL` or install from bioconductor.
+
+__Loading the package.__ To load the `MethylMix` package in your R session, type `library(MethylMix)`.
+
+__Help files.__  Detailed information on `MethylMix` package 
+functions can be obtained in the help files. For example, to view the help file 
+for the function `MethylMix` in a R session, use `?MethylMix`.
+
+##2. Introduction
+
+DNA methylation is a mechanism whereby a methyl-group is added onto a CpG site. 
+Methylation of these CpG sites is associated with gene silencing and is an 
+important mechanism for normal tissue development and is often involved in 
+diseases such as cancer. Recently, many high throughput data has been generated 
+profiling CpG site methylation on a genome wide bases. This has created large 
+amounts of data on DNA methylation for many disease. Computational analysis of 
+DNA methylation data is required to identify potentiall aberrant DNA methylation 
+compared to normal tissue. MethylMix (Gevaert 2015; Gevaert, Tibshirani & Plevritis 2015) was developed to tackle this question using 
+a computational approach. MethylMix identifies differential and functional DNA 
+methylation by using a beta mixture model to identify subpopulations of samples 
+with different DNA methylation compared to normal tissue. Functional DNA 
+methylation refers to a significant negative correlation based on matched gene 
+expression data. Together MethylMix outputs hyper and hypomethylated genes which 
+can be used for downstream analysis, and are called MethylMix drivers. MethylMix 
+was designed for cis-regulated promoter differential methylation and works best 
+when specific CpG sites are profiled associated with a gene. For example using 
+data from the 27k and 450k Infinium platforms. 
+
+##3. Data access and preprocessing
+
+The `MethylMix` package provides functions to access and preprocess data at The Cancer Genome Atlas (TCGA) 
+portal. Given a cancer type indicated by TCGA's code and a path to save downloaded files, all the download and
+preprocess of data can be executed with:
+
+```{r, eval=FALSE}
+cancerSite <- "OV"
+targetDirectory <- paste0(getwd(), "/")
+GetData(cancerSite, targetDirectory)
+```
+
+All functions in the `MethylMix` package can be run in parallel, if the user provides a parallel set up, like
+the following:
+
+```{r, eval=FALSE}
+cancerSite <- "OV"
+targetDirectory <- paste0(getwd(), "/")
+
+library(doParallel)
+cl <- makeCluster(5)
+registerDoParallel(cl)
+GetData(cancerSite, targetDirectory)
+stopCluster(cl)
+```
+
+The `GetData` function downloads DNA methylation data and gene expression. The methylation data
+is provided using 27k or 450k Illumina platforms. If both 27k and 450k files are found, the data
+is carefully combined. For gene expression, either microarray (Agilent), RNA sequencing data or
+both are available. The `MethylMix` package downloads RNA sequencing data for all cancer sites
+except for ovarian and gliobastoma cancer sites (few RNA-seq samples available). 
+For the preprocessing of the data, we package perform missing value estimation and batch
+correction (using Combat).
+Finally, as in the TCGA case, when only probe level Illumina data is available, mapping probes to genes is 
+recommended before building mixture models. This allows to focus on cis-
+regulated differential methylation by only focusing on differential methylation 
+of CpG sites to their closest gene transcripts. Both the 27k and 450k Illumina 
+platforms have database R packages that provide the necessary mapping 
+information. We use the annotation to map probes to genes, before clustering the probes
+within each gene. This whole process can take a long time, depending of the size of the data.
+
+It is also possible to perform each one of these task individually using other functions 
+in the `MethylMix` package, as in the following example:
+
+```{r, eval=FALSE, tidy=TRUE}
+cancerSite <- "OV"
+targetDirectory <- paste0(getwd(), "/")
+
+cl <- makeCluster(5)
+registerDoParallel(cl)
+
+# Downloading methylation data
+METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory)
+# Processing methylation data
+METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
+# Saving methylation processed data
+saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
+
+# Downloading gene expression data
+GEdirectories <- Download_GeneExpression(cancerSite, targetDirectory)
+# Processing gene expression data
+GEProcessedData <- Preprocess_GeneExpression(cancerSite, GEdirectories)
+# Saving gene expression processed data
+saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", cancerSite, "_Processed.rds"))
+
+# Clustering probes to genes methylation data
+METProcessedData <- readRDS(paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
+res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+
+# Putting everything together in one file
+toSave <- list(METcancer = res[[1]], METnormal = res[[2]], GEcancer = GEProcessedData[[1]], GEnormal = GEProcessedData[[2]], ProbeMapping = res$ProbeMapping)
+saveRDS(toSave, file = paste0(targetDirectory, "data_", cancerSite, ".rds"))
+
+stopCluster(cl)
+```
+
+## 4. Data input for MethylMix
+
+To run MethylMix three data sets of a particular disease are required. The first one is 
+the methylation data for the disease samples, `METcancer`, which allows to 
+identify methylation states associated with a disease for each gene of interest. 
+The second is an appropriate normal or baseline methylation data, `METnormal`, which
+is used to distinguish between hyper or increased methylation vs. hypo or decreased methylation.
+Finally, the third data set is matched gene expression data for the disease samples, `GEcancer`,
+which is used to identify functional differnential methylation by focusing only on differentialy 
+methylation that has a significant inversely correlated effect on gene 
+expression. 
+
+Each of these three data sets are matrix objects with genes in the 
+rows with unique rownames (e.g. gene symbols) and samples or patients in the 
+columns with unique patient names. The `GetData` function described before
+saves an R object which contains these matrices in the correct format.
+
+As example, small data sets from TCGA of gliobastoma samples are availabe in the
+`MethylMix` package:
+
+```{r, tidy=TRUE}
+library(MethylMix)
+library(doParallel)
+data(METcancer)
+data(METnormal)
+data(GEcancer)
+head(METcancer[, 1:4])
+head(METnormal)
+head(GEcancer[, 1:4])
+```
+
+## 5. Running MethylMix
+
+Using the example gliobastoma data provided in the package, `MethylMix` can be 
+to identify hypo and hypermethylated genes run as follows:
+
+```{r, tidy=TRUE, warning=F}
+MethylMixResults <- MethylMix(METcancer, GEcancer, METnormal)
+```
+
+Or in parallel:
+
+```{r, tidy=TRUE, eval=FALSE}
+library(doParallel)
+cl <- makeCluster(5)
+registerDoParallel(cl)
+MethylMixResults <- MethylMix(METcancer, GEcancer, METnormal)
+stopCluster(cl)
+```
+
+The output from the `MethylMix` function is a list with the following elements:
+
+* `MethylationDrivers`: Genes identified as transcriptionally predictive and differentially methylated by MethylMix.
+* `NrComponents`: The number of methylation states found for each driver gene.
+* `MixtureStates`: A list with the DM-values for each driver gene.
+* `MethylationStates`: Matrix with DM-values for all driver genes (rows) and all samples (columns).
+* `Classifications`: Matrix with integers indicating to which mixture component each cancer sample was assigned to, for each gene.
+* `Models`: Beta mixture model parameters for each driver gene.
+
+Differential Methylation values (DM-values) are defined as the difference between 
+the methylation mean in one mixture component of cancer samples and the methylation mean
+in the normal samples, for a given gene.
+
+```{r, tidy=TRUE}
+MethylMixResults$MethylationDrivers
+MethylMixResults$NrComponents
+MethylMixResults$MixtureStates
+MethylMixResults$MethylationStates[, 1:5]
+MethylMixResults$Classifications[, 1:5]
+# MethylMixResults$Models
+```
+
+## 6. Graphical output
+
+The `MethylMix` package also provides functions to visually represent the findings:
+
+```{r, tidy=TRUE, eval=F}
+# Plot the most famous methylated gene for glioblastoma
+plots <- MethylMix_PlotModel("MGMT", MethylMixResults, METcancer)
+plots$MixtureModelPlot
+```
+
+<img src="plot1.png" width="500">
+
+```{r, tidy=TRUE, eval=F}
+# Plot MGMT also with its normal methylation variation
+plots <- MethylMix_PlotModel("MGMT", MethylMixResults, METcancer, METnormal = METnormal)
+plots$MixtureModelPlot
+```
+
+<img src="plot2.png" width="500">
+
+```{r, tidy=TRUE, eval=F}
+# Plot a MethylMix model for another gene
+plots <- MethylMix_PlotModel("ZNF217", MethylMixResults, METcancer, METnormal = METnormal)
+plots$MixtureModelPlot
+```
+
+<img src="plot3.png" width="500">
+
+```{r, tidy=TRUE, eval=F}
+# Also plot the inverse correlation with gene expression (creates two separate plots)
+plots <- MethylMix_PlotModel("MGMT", MethylMixResults, METcancer, GEcancer, METnormal)
+plots$MixtureModelPlot
+plots$CorrelationPlot
+```
+
+<img src="plot2.png" width="300"> <img src="plot4.png" width="300">
+
+```{r, eval = FALSE, tidy=TRUE}
+# Plot all functional and differential genes
+for (gene in MethylMixResults$MethylationDrivers) {
+    MethylMix_PlotModel(gene, MethylMixResults, METcancer, METnormal = METnormal)
+}
+```
+
+## 7. References
+Gevaert 0. MethylMix: an R package for identifying DNA methylation-driven genes. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020 \n
+
+Gevaert O, Tibshirani R, Plevritis SK. Pancancer analysis of DNA methylation-driven genes using MethylMix. Genome Biology. 2015;16(1):17. doi:10.1186/s13059-014-0579-8 ",
+
+
+## 8. Sesssion Info
+
+```{r, tidy=TRUE, echo = FALSE}
+sessionInfo()
+```
