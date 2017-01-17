@@ -11,7 +11,7 @@ author: |
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Consensus Clustering}
+  %\VignetteIndexEntry{MethylMix}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
