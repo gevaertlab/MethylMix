@@ -1,0 +1,17 @@
+MethylMix 2.0.0 (Release date: 2017-01-17)
+==============
+
+Changes:
+
+* We added functions to automatically download and process methylation and gene expression data from TCGA.
+* We added functions to cluster CpG sites into gene clusters.
+* All the functionality can be run in parallel.
+* We implemented ggplot2 plots for graphical representation.
+* We added some arguments (e.g. listOfGenes, filter, etc.) to gain flexibility in the analysis.
+
+MethylMix 0.99.1 (Release date: 2014-08-08)
+==============
+
+Changes:
+
+* This marks the first release to BioConductor of MethylMix. We included two data sets to test MethylMix: a glioblastoma and breast cancer data set. We have included one vignettes which uses a breast cancer example to show the functionality of MethylMix.      
