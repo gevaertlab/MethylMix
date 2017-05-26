@@ -185,65 +185,19 @@ get_firehoseData <- function(downloadData=TRUE,
         return(cat("here are the possible TCGA database disease acronyms. \nRe-run this function with printDisease_abbr=FALSE to then run an actual query.\n\n",cancers));      
     }
     gdacURL_orig <- gdacURL
-    urlData <- RCurl::getURL(gdacURL)
-    urlData <- limma::strsplit2(urlData,paste(dataType,"__",sep=""))
     
-    #first column is junk
-    urlData <- urlData[,2:dim(urlData)[2]]
-    urlData <- limma::strsplit2(urlData,"/")
-    urlData <- urlData[,1]
-    #see the strptime codes here: http://stat.ethz.ch/R-manual/R-devel/library/base/html/strptime.html
-    #I am transferring this text to dates: that way, we can programmatically find the latest one.
-    #the POSIXct class in R is the date-time class
-    urlData <- as.POSIXct(strptime(urlData, "%Y_%m_%d"))
-    #want to remove time zone: do as.Date
-    dateData <- as.Date(urlData[which(!is.na(urlData))])
-    lastDate <- dateData[match( summary(dateData)[which(names(summary(dateData))=="Max.")], dateData)]
-    
-    #sub back _ symbols
-    lastDate <- gsub("-","_",as.character(lastDate))
-    
-    lastDateCompress <- gsub("_","",lastDate)
-    #need last "/" for it to find this page.
-    
-    gdacURL <- paste(gdacURL,dataType,"__",lastDate,"/data/",TCGA_acronym_uppercase,"/",lastDateCompress,"/",sep="")
-    
-    #now get full dataset name. we just have the http link to the last page we select this dataset from right now.
-    urlData <- RCurl::getURL(gdacURL)
-    
-    
-    #regular expressions: need \ to have R recognize any " or \ that's actually in our text
-    urlData <- limma::strsplit2(urlData,"href=\\\"")
-    
-    while(length(grep("was not found",urlData))>0) {
-        warning(paste0("\nThe TCGA run dated ",lastDate, "for ", dataType,
-                       " for disease ",TCGA_acronym_uppercase," isn't available for download yet.
-                       Taking the run dated just before this one.\n"))
-        dateData <-  dateData[-which(dateData==(summary(dateData)[which(names(summary(dateData))=="Max.")]))]
-        lastDate <- dateData[match( summary(dateData)[which(names(summary(dateData))=="Max.")], dateData)]
-        #sub back _ symbols
-        lastDate <- gsub("-","_",as.character(lastDate))
-        lastDateCompress <- gsub("_","",lastDate)
-        #need last "/" for it to find this page.
-        gdacURL <- paste(gdacURL_orig,dataType,"__",lastDate,"/data/",TCGA_acronym_uppercase,"/",lastDateCompress,"/",sep="")
-        
-        #now get full dataset name. we just have the http link to the last page we select this dataset from right now.
-        urlData <- RCurl::getURL(gdacURL)
-        #regular expressions: need \ to have R recognize any " or \ that's actually in our text
-        urlData <- limma::strsplit2(urlData,"href=\\\"")
-        
-        #did we reach the end of the dates - ie only one left? leave the loop then.
-        if(length(dateData)<=1){		
-            break	
-        }  
-    } 
-    
-    #cat("Using data from date ",lastDate,"\n")
-    #should be OK now!
-    if(length(grep("was not found",urlData))>0){  
-        #this disease may not even be in the analyses directory yet.
-        stop( paste0("\nNot returning any viable url data paths after searching by date for disease ",TCGA_acronym_uppercase,". No data was downloaded.\n"))
-    }
+    # New code to handle dates - Marcos
+    gdacURLnew <- paste0(gdacURL_orig, dataType, "__latest/data/", TCGA_acronym_uppercase, "/")
+    urlDataNew <- RCurl::getURL(gdacURLnew)
+    urlDataNew <- limma::strsplit2(urlDataNew, "href=\\\"") #regular expressions: need \ to have R recognize any " or \ that's actually in our text
+    getlatestdate <- urlDataNew[grep("^201[0-9][01][0-9][0123][0-9]", urlDataNew)]
+    getlatestdate <- substring(getlatestdate, 1, 8)
+    gdacURLnew <- paste0(gdacURLnew, getlatestdate, "/")
+    urlData <- RCurl::getURL(gdacURLnew)
+    urlData <- limma::strsplit2(urlData, "href=\\\"") #regular expressions: need \ to have R recognize any " or \ that's actually in our text
+    lastDateCompress <- lastDate <- getlatestdate # for compatibility with the rest of old code
+    gdacURL <- gdacURLnew # for compatibility with the rest of old code
+    # end New code
     
     #remove any FFPE datasets, or only keep those depending on user inputs.
     if (FFPE) { 
@@ -277,72 +231,82 @@ get_firehoseData <- function(downloadData=TRUE,
     
     #final download url
     gdacURL <- paste(gdacURL,fileName,sep="")
-    
-    # Keep the savedir when we don't download !!!!!!!!
+    # Directory for downloads
     saveDir <- paste(saveDir,"gdac_",lastDateCompress,'/',sep="")
-    tarfile=paste0(saveDir,fileName)
-    finalDir <-  strsplit(tarfile, paste0(".", fileType))[[1]][1]
     
-    if (grepl("Windows", Sys.info()['sysname'])) {
-        # name of file can get too long (and it's repeated in the folder and the file) and windows
-        # internally will use another representation for the name of the folder, so then when
-        # we want to load the file it says it doesn't exist. So I'm changing the name of the file 
-        # to make it shorter so this doesn't happen. To get an unique and repetible name, I'm going to use the
-        # digest function. Now the folder name is not informative of what's inside, but the file
-        # inside has the complete name so we can look at it.
-        newname <- digest::digest(fileName, serialize = FALSE)
-        longname <- finalDir # original name of the folder
-        finalDir <- paste0(saveDir, newname) # this is the new name for the folder
-    }
-    
-    if(downloadData){		
-        cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")				
-        cat("\tThis may take 10-60 minutes depending on the size of the data set.\n")
-        
-        # create dirs
-        dir.create(saveDir,showWarnings=FALSE)
-        
-        # download file		
-        setwd(saveDir)				
-        download.file(gdacURL,fileName,quiet=FALSE,mode="wb")
-        
-        #this assumes a tar.gz file.
-        if(fileType=="tar.gz" && untarUngzip) {					
-            cat("\tUnpacking data.\n")
-            tarfile=paste0(saveDir,fileName)
-            untar(tarfile)
-            
-            if (grepl("Windows", Sys.info()['sysname'])) file.rename(longname, finalDir)
-            
-            #remove tarred file
-            fileToRemove <- limma::strsplit2(gdacURL,"/")[ ,ncol(limma::strsplit2(gdacURL,"/"))]
-            file.remove(paste0(saveDir,fileToRemove))
-            
-        } else if(untarUngzip) {		
-            warning("File expansion/opening only built in for tar.gz files at the moment.\n")		
+    if (!grepl("Windows", Sys.info()['sysname'])) {
+        # Not Windows
+        tarfile=paste0(saveDir,fileName)
+        finalDir <-  strsplit(tarfile, paste0(".", fileType))[[1]][1]
+        if(downloadData){		
+            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")				
+            cat("\tThis may take 10-60 minutes depending on the size of the data set.\n")
+            dir.create(saveDir,showWarnings=FALSE)
+            # download file		
+            setwd(saveDir)				
+            download.file(gdacURL,fileName,quiet=FALSE,mode="wb")
+            #this assumes a tar.gz file.
+            if(fileType=="tar.gz" && untarUngzip) {					
+                cat("\tUnpacking data.\n")
+                tarfile=paste0(saveDir,fileName)
+                untar(tarfile)
+                #remove tarred file
+                fileToRemove <- limma::strsplit2(gdacURL,"/")[ ,ncol(limma::strsplit2(gdacURL,"/"))]
+                removed <- file.remove(paste0(saveDir,fileToRemove))
+            } else if(untarUngzip) {		
+                warning("File expansion/opening only built in for tar.gz files at the moment.\n")		
+            }		
+            cat("\tFinished downloading",dataFileTag,"data to",finalDir,"\n")
+        } else {
+            cat("\tdownload data url is :\n ",gdacURL,'\n')
         }
-        
-        # finalDir <- limma::strsplit2(gdacURL,"/")[ ,ncol(limma::strsplit2(gdacURL,"/"))]
-        # finalDir <- limma::strsplit2(finalDir,fileType)		
-        # #must remove LAST period (ie laster character) only. 
-        # finalDir <- substr(finalDir,start=0,stop=(nchar(finalDir)-1))
-        # finalDir <- paste0(saveDir,finalDir)		
-        cat("\tFinished downloading",dataFileTag,"data to",finalDir,"\n")
-        
+        DownloadedFile=paste0(finalDir,'/')
+        return(DownloadedFile)
     } else {
-        #just spit out the command you need
-        cat("\tdownload data url is :\n ",gdacURL,'\n')
-        
-        # finalDir <- limma::strsplit2(gdacURL,"/")[ ,ncol(limma::strsplit2(gdacURL,"/"))]
-        # finalDir <- limma::strsplit2(finalDir,fileType)
-        # #must remove LAST period (ie laster character) only. 
-        # finalDir <- substr(finalDir,start=0,stop=(nchar(finalDir)-1))
-        # finalDir <- paste0(saveDir,finalDir)
+        # new code to handle long names in windows - Marcos
+        # WINDOWS: name of file can be too long (and it's repeated in the folder and the file) and windows
+        # internally will use another representation for the name of the folder, so then when
+        # we want to load the file it says it doesn't exist. So I'm changing the name of the folder
+        # to prevent this. We can't change the name of the file as it's used in the Preprocess functions
+        idx <- which(sapply(c("methylation27", "methylation450", "mRNAseq", "transcriptome"), grepl, dataFileTag))[1]
+        newtag <- ifelse(idx == 1, "meth27", ifelse(idx == 2, "meth450", "geneexpr"))
+        nameForFolder <- paste(TCGA_acronym_uppercase, dataType, newtag, sep = "_")
+        nameForDownloadedFile <- paste0(nameForFolder, ".", fileType)
+        nameForDownloadedFileFullPath <- paste0(saveDir, nameForDownloadedFile)
+        finalDir <- paste0(saveDir, nameForFolder)
+        if (downloadData) {
+            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")				
+            cat("\tThis may take 10-60 minutes depending on the size of the data set.\n")
+            dir.create(saveDir, showWarnings = FALSE)
+            
+            # Create a virtual drive to overcome long names issue in Windows
+            saveDir2 <- gsub("\\\\", "/", saveDir)
+            saveDir2 <- substr(saveDir2, 1, nchar(saveDir2) - 1)
+            system(paste("subst x:", saveDir2))
+            
+            download.file(gdacURL, destfile = paste0("x://", nameForDownloadedFile), quiet = FALSE, mode = "wb")
+            #this assumes a tar.gz file.
+            if(fileType == "tar.gz" && untarUngzip) {					
+                cat("\tUnpacking data.\n")
+                untar(nameForDownloadedFileFullPath, exdir = saveDir)
+                # untar(paste0("x://", nameForDownloadedFile), exdir = "x://") # doesn't work because it calls system and system doesnt know about the virtual drive
+                removed <- file.remove(paste0("x://", nameForDownloadedFile))
+                # Anyway I change folder name to make it shorter
+                changed <- file.rename(from = paste0("x://", gsub(".tar.gz", "", fileName)), to = paste0("x://", nameForFolder))
+                system("subst x: /D") # stop the virtual drive
+            } else if(untarUngzip) {		
+                warning("File expansion/opening only built in for tar.gz files at the moment.\n")		
+            }
+            cat("\tFinished downloading", dataFileTag, "data to", finalDir,"\n")
+        } else {
+            cat("\tdownload data url is :\n ", gdacURL, '\n')
+        }
+        DownloadedFile = paste0(finalDir, '/')
+        return(DownloadedFile)
+        # end new code
     }
-    DownloadedFile=paste0(finalDir,'/')
-    return(DownloadedFile)
-    
 }
+
 
 #' The Preprocess_DNAmethylation function
 #' 
@@ -489,15 +453,31 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, METdirectory, Missi
     
     # Settings
     get("BatchData")
-    # data("BatchData") #here uncomment this line and remove the following
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/BatchData.rda")
     MinPerBatch=5
     
-    # Load data
-    METfiles=dir(METdirectory)
-    MatchedFilePosition=grep('methylation__humanmethylation27',METfiles)             
-    Filename=paste0(METdirectory,METfiles[MatchedFilePosition])          
-    MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+    if (grepl("Windows", Sys.info()['sysname'])) {
+        # If Windows I'll create a virtual drive to handle the long file names issue
+        # Create a virtual drive to overcome long names issue in Windows
+        virtualDir <- METdirectory
+        virtualDir <- gsub("\\\\", "/", virtualDir)
+        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
+        system(paste("subst x:", virtualDir))
+        
+        # Load data
+        METfiles <- dir("x:")
+        MatchedFilePosition <- grep('methylation__humanmethylation27', METfiles)             
+        Filename <- paste0("x://", METfiles[MatchedFilePosition])          
+        MET_Data <- TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+        
+        system("subst x: /D") #stop virtual drive
+    } else {
+        # Not windows
+        # Load data
+        METfiles=dir(METdirectory)
+        MatchedFilePosition=grep('methylation__humanmethylation27',METfiles)             
+        Filename=paste0(METdirectory,METfiles[MatchedFilePosition])          
+        MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+    }
     
     # Split up normal and cancer data
     Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MET_Data))
@@ -564,14 +544,31 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, METdirectory, Missi
 Preprocess_CancerSite_Methylation450k <- function(CancerSite, METdirectory, MissingValueThreshold = 0.2) {
     
     get("BatchData")
-    # data("BatchData") #here uncomment this line and remove the following
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/BatchData.rda")
     MinPerBatch=5
     
-    METfiles=dir(METdirectory)
-    MatchedFilePosition=grep('methylation__humanmethylation450',METfiles)             
-    Filename=paste0(METdirectory,METfiles[MatchedFilePosition])     
-    MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+    if (grepl("Windows", Sys.info()['sysname'])) {
+        # If Windows I'll create a virtual drive to handle the long file names issue
+        # Create a virtual drive to overcome long names issue in Windows
+        virtualDir <- METdirectory
+        virtualDir <- gsub("\\\\", "/", virtualDir)
+        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
+        system(paste("subst x:", virtualDir))
+        
+        # Load data
+        METfiles <- dir("x:")
+        MatchedFilePosition <- grep('methylation__humanmethylation450', METfiles)             
+        Filename <- paste0("x://", METfiles[MatchedFilePosition])          
+        MET_Data <- TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+        
+        system("subst x: /D") #stop virtual drive
+    } else {
+        # Not windows
+        # Load data
+        METfiles=dir(METdirectory)
+        MatchedFilePosition=grep('methylation__humanmethylation450',METfiles)             
+        Filename=paste0(METdirectory,METfiles[MatchedFilePosition])          
+        MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
+    }
     
     # Split up normal and cancer data
     Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MET_Data))
@@ -803,7 +800,7 @@ TCGA_Process_EstimateMissingValues <- function(MET_Data, MissingValueThreshold =
     NrMissingsPerGene=apply(MET_Data,1,function(x) sum(is.na(x)))/ncol(MET_Data)
     cat("Removing",sum(NrMissingsPerGene>MissingValueThreshold),"genes with more than",MissingValueThreshold*100,"% missing values.\n")
     if (sum(NrMissingsPerGene>MissingValueThreshold)>0) MET_Data=MET_Data[NrMissingsPerGene<MissingValueThreshold,,drop=FALSE]
-
+    
     # knn impute using Tibshirani's method
     if (length(colnames(MET_Data))>1) {
         k=15
@@ -1040,8 +1037,6 @@ Download_GeneExpression <- function(CancerSite,TargetDirectory,downloadData=TRUE
 Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
     
     get("BatchData")
-    # data("BatchData") #here uncomment this line and remove the following
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/BatchData.rda")
     MinPerBatchCancer=5    
     MinPerBatchNormal=2    
     
@@ -1052,6 +1047,17 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
         MAstring='mRNAseq_RPKM_log2.txt'
     } else {
         MAstring='mRNAseq_RSEM_normalized_log2.txt'
+    }
+    
+    if (grepl("Windows", Sys.info()['sysname'])) {
+        # If Windows I'll create a virtual drive to handle the long file names issue
+        # Create a virtual drive to overcome long names issue in Windows
+        MAdirectoriesOrig <- MAdirectories
+        virtualDir <- MAdirectories
+        virtualDir <- gsub("\\\\", "/", virtualDir)
+        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
+        system(paste("subst x:", virtualDir))
+        MAdirectories <- "x://"
     }
     
     #cat("Loading mRNA data.\n")
@@ -1131,6 +1137,9 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
     } else {
         MA_TCGA_Normal = TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Normal, 12)
     }
+    
+    if (grepl("Windows", Sys.info()['sysname'])) system("subst x: /D") #stop virtual drive
+    
     return(list(GEcancer = MA_TCGA_Cancer, GEnormal = MA_TCGA_Normal))
 }
 
@@ -1148,8 +1157,6 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
 Preprocess_MAdata_Cancer <- function(CancerSite,Directory,File,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
     
     get("BatchData")
-    # data(BatchData) #here uncomment this line and remove the following
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/BatchData.rda")
     
     MinPerBatch=5   
     cat("Loading cancer mRNA data.\n")
@@ -1188,8 +1195,6 @@ Preprocess_MAdata_Cancer <- function(CancerSite,Directory,File,MissingValueThres
 Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
     
     get("BatchData")
-    # data(BatchData) #here uncomment this line and remove the following
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/BatchData.rda")
     
     MinPerBatch=2 # less samples in one batch when dealing with normals.
     
@@ -1227,6 +1232,7 @@ Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThres
 #' @keywords internal
 #'
 TCGA_Load_MolecularData <- function(Filename, MissingValueThresholdGene = 0.3, MissingValueThresholdSample = 0.1) {     
+    
     # loading the data in R
     Matching=regexpr('.mat$',Filename,perl=TRUE)
     if (Matching[[1]]>0) {     
@@ -1250,7 +1256,7 @@ TCGA_Load_MolecularData <- function(Filename, MissingValueThresholdGene = 0.3, M
     SampleNames=colnames(MET_Data)
     SampleNames=gsub('\\.','-',SampleNames)
     colnames(MET_Data)=SampleNames
-
+    
     # removing clones with too many missing values
     NrMissingsPerGene=apply(MET_Data,1,function(x) sum(is.na(x))) /ncol(MET_Data)
     cat("Removing",sum(NrMissingsPerGene>MissingValueThresholdGene),"genes with more than",MissingValueThresholdGene*100,"% missing values.\n")
@@ -1353,13 +1359,9 @@ ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
     }
     
     #Get probe information
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/ProbeAnnotation.Rdata") #here delete this and uncomment next
-    # data(ProbeAnnotation)
     get("ProbeAnnotation")
     
     # remove probes with SNPs
-    # load("/home/marcosp/methylmixdevel/Marcos/MethylMix2/Code_develop_new_code/SNPprobes.Rdata") #here delete this and uncomment next
-    # data(SNPprobes)
     get("SNPprobes")
     
     GoodProbes=setdiff(rownames(MET_Cancer),SNPprobes)
@@ -1392,7 +1394,7 @@ ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
     tmpClusterResults = foreach::foreach(i=1:length(UniqueGenes), .export='TCGA_GENERIC_MET_ClusterProbes_Helper_ClusterGenes_with_hclust') %dopar% {
         TCGA_GENERIC_MET_ClusterProbes_Helper_ClusterGenes_with_hclust(UniqueGenes[i],ProbeAnnotation,MET_Cancer,MET_Normal,CorThreshold)
     }
-      
+    
     for ( i in 1:length(UniqueGenes) ) {            
         MET_Cancer_C[METmatrixCounter:(METmatrixCounter-1+nrow(tmpClusterResults[[i]][[1]])),]=tmpClusterResults[[i]][[1]]               
         if (!is.null(MET_Normal)) MET_Normal_C[METmatrixCounter:(METmatrixCounter-1+nrow(tmpClusterResults[[i]][[2]])),]=tmpClusterResults[[i]][[2]]
@@ -1412,7 +1414,7 @@ ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
     } else {
         MET_Normal_C = NULL
     }
-
+    
     cat("\nFound",length(rownames(MET_Cancer_C)),"CpG site clusters.\n")
     return(list(MET_Cancer_Clustered=MET_Cancer_C,MET_Normal_Clustered=MET_Normal_C,ProbeMapping=ProbeMapping))
 }

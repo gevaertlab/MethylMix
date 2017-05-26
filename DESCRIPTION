@@ -1,6 +1,6 @@
 Package: MethylMix
 Title: MethylMix: Identifying methylation driven cancer genes
-Version: 2.2.0
+Version: 2.4.0
 Description: MethylMix is an algorithm implemented to identify hyper and
     hypomethylated genes for a disease. MethylMix is based on a beta mixture model
     to identify methylation states and compares them with the normal DNA methylation
@@ -21,7 +21,7 @@ LazyData: true
 Author: Olivier Gevaert
 Maintainer: Olivier Gevaert <olivier.gevaert@gmail.com>
 Type: Package
-Date: 2017-01-13
+Date: 2017-05-25
 Imports:
     foreach,
     RPMM,
