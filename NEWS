@@ -1,4 +1,12 @@
-MethylMix 2.0.0 (Release date: 2017-01-17)
+MethylMix v2.4-0 (Release date: 2017-05-25)
+==============
+
+Changes:
+
+* Bugs correction for data download
+* Addition of function for predictions
+
+MethylMix v2.0-0 (Release date: 2017-01-17)
 ==============
 
 Changes:
@@ -9,9 +17,9 @@ Changes:
 * We implemented ggplot2 plots for graphical representation.
 * We added some arguments (e.g. listOfGenes, filter, etc.) to gain flexibility in the analysis.
 
-MethylMix 0.99.1 (Release date: 2014-08-08)
+MethylMix v0.99-1 (Release date: 2014-08-08)
 ==============
 
 Changes:
 
-* This marks the first release to BioConductor of MethylMix. We included two data sets to test MethylMix: a glioblastoma and breast cancer data set. We have included one vignettes which uses a breast cancer example to show the functionality of MethylMix.      
+* This marks the first release to BioConductor of MethylMix. We included two data sets to test MethylMix: a glioblastoma and breast cancer data set. We have included one vignettes which uses a breast cancer example to show the functionality of MethylMix.

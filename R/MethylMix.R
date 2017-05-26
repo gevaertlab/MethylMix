@@ -29,6 +29,11 @@
 #   - Before only took care of the case with 2 genes, now I added code to take care of a common pattern when there are 3 components.
 # Plots:
 #   - Moved to ggplot2 plots.
+# Getting data from firehose:
+#   - Dates handling modified
+#   - Managed issue with long file names in Windows
+# Predictions:
+#   - Added function to predict mixture component for new data
 
 # Fix for NOTEs from R CMD check (no visible binding for global variable)
 if(getRversion() >= "2.15.1")  {
@@ -767,4 +772,70 @@ MethylMix_PlotModel <- function(GeneName, MixtureModelResults, METcancer, GEcanc
     } else {
         cat(paste(GeneName, "not found.\n"))
     }
+}
+
+#' The MethylMix_Predict function
+#' 
+#' Given a new data set with methylation data, this function predicts the mixture
+#' component for each new sample and driver gene. Predictions are based on posterior 
+#' probabilities calculated with MethylMix'x fitted mixture model.
+#' 
+#' @param newBetaValuesMatrix Matrix with new observations for prediction, 
+#' genes/cpg sites in rows, samples in columns. Although this new matrix can have
+#' a different number of genes/cpg sites than the one provided as METcancer when
+#' running MethylMix, naming of genes/cpg sites should be the same.
+#' @param MethylMixResult Output object from MethylMix
+#' 
+#' @return A matrix with predictions (indices of mixture component), driver genes in rows, new samples in columns
+#' @export
+#' @examples
+#' # load the three data sets needed for MethylMix
+#' data(METcancer)
+#' data(METnormal)
+#' data(GEcancer)
+#' 
+#' # run MethylMix on a small set of example data
+#' MethylMixResults <- MethylMix(METcancer, GEcancer, METnormal)
+#' # toy example new data, of same dimension of original METcancer data
+#' newMETData <- matrix(runif(length(METcancer)), nrow = nrow(METcancer))
+#' rownames(newMETData) <- rownames(METcancer)
+#' colnames(newMETData) <- paste0("sample", 1:ncol(METcancer))
+#' predictions <- MethylMix_Predict(newMETData, MethylMixResults)
+#' 
+MethylMix_Predict <- function(newBetaValuesMatrix, MethylMixResult) {
+    
+    predictOneGene <- function(newVector, mixtureModel) {
+        # Auxiliar function
+        # Given a new vector of beta values, this function calculates a matrix with posterior prob of belonging 
+        # to each mixture commponent (columns) for each new beta value (rows), 
+        # and return the number of the mixture component with highest posterior probabilit
+        # newVector: vector with new beta values
+        # mixtureModel: beta mixture model object for the gene being evaluated.
+        densities <- sapply(newVector, function(newObs) {
+            mapply(dbeta, newObs, mixtureModel$a, mixtureModel$b) # density value in each mixture
+        })
+        numerator <- apply(densities, 2, `*`, mixtureModel$eta)
+        denominator <- colSums(numerator)
+        posteriorProb <- apply(numerator, 1, function(x) x / denominator)
+        # If densities are all 0 (can happen for x near 0 or 1), denominator is 0, assign mixing prop as posterior prob
+        idx <- which(denominator == 0)
+        if (length(idx) > 0) posteriorProb[idx, ] <- matrix(mixtureModel$eta, nrow = length(idx), ncol = length(mixtureModel$eta), byrow = T)
+        predictedMixtureComponent <- apply(posteriorProb, 1, which.max)
+        return(predictedMixtureComponent)
+    }
+    
+    # From new data keep only driver genes
+    drivers <- intersect(MethylMixResult$MethylationDrivers, rownames(newBetaValuesMatrix))
+    
+    # For each driver gene, predict class through all samples
+    predictions <- matrix(NA, nrow = length(drivers), ncol = ncol(newBetaValuesMatrix), dimnames = list(drivers, colnames(newBetaValuesMatrix)))
+    for (driver in drivers) {
+        if (MethylMixResult$NrComponents[[driver]] > 1) {
+            predictions[driver, ] <- predictOneGene(newBetaValuesMatrix[driver, ], MethylMixResult$Models[[driver]])
+        } else {
+            predictions[driver, ] <- 1  # driver gene has only one component, no prediction to make
+        }
+        
+    }
+    return(predictions)
 }
