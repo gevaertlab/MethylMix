@@ -804,26 +804,6 @@ MethylMix_PlotModel <- function(GeneName, MixtureModelResults, METcancer, GEcanc
 #' 
 MethylMix_Predict <- function(newBetaValuesMatrix, MethylMixResult) {
     
-    predictOneGene <- function(newVector, mixtureModel) {
-        # Auxiliar function
-        # Given a new vector of beta values, this function calculates a matrix with posterior prob of belonging 
-        # to each mixture commponent (columns) for each new beta value (rows), 
-        # and return the number of the mixture component with highest posterior probabilit
-        # newVector: vector with new beta values
-        # mixtureModel: beta mixture model object for the gene being evaluated.
-        densities <- sapply(newVector, function(newObs) {
-            mapply(dbeta, newObs, mixtureModel$a, mixtureModel$b) # density value in each mixture
-        })
-        numerator <- apply(densities, 2, `*`, mixtureModel$eta)
-        denominator <- colSums(numerator)
-        posteriorProb <- apply(numerator, 1, function(x) x / denominator)
-        # If densities are all 0 (can happen for x near 0 or 1), denominator is 0, assign mixing prop as posterior prob
-        idx <- which(denominator == 0)
-        if (length(idx) > 0) posteriorProb[idx, ] <- matrix(mixtureModel$eta, nrow = length(idx), ncol = length(mixtureModel$eta), byrow = T)
-        predictedMixtureComponent <- apply(posteriorProb, 1, which.max)
-        return(predictedMixtureComponent)
-    }
-    
     # From new data keep only driver genes
     drivers <- intersect(MethylMixResult$MethylationDrivers, rownames(newBetaValuesMatrix))
     
@@ -838,4 +818,29 @@ MethylMix_Predict <- function(newBetaValuesMatrix, MethylMixResult) {
         
     }
     return(predictions)
+}
+
+#' The predictOneGene function
+#' 
+#' Auxiliar function. Given a new vector of beta values, this function calculates a matrix with posterior prob of belonging 
+#' to each mixture commponent (columns) for each new beta value (rows), 
+#' and return the number of the mixture component with highest posterior probabilit
+#' 
+#' @param newVector vector with new beta values
+#' @param mixtureModel beta mixture model object for the gene being evaluated.
+#' 
+#' @return A matrix with predictions (indices of mixture component), driver genes in rows, new samples in columns
+#' 
+predictOneGene <- function(newVector, mixtureModel) {
+    densities <- sapply(newVector, function(newObs) {
+        mapply(dbeta, newObs, mixtureModel$a, mixtureModel$b) # density value in each mixture
+    })
+    numerator <- apply(densities, 2, `*`, mixtureModel$eta)
+    denominator <- colSums(numerator)
+    posteriorProb <- apply(numerator, 1, function(x) x / denominator)
+    # If densities are all 0 (can happen for x near 0 or 1), denominator is 0, assign mixing prop as posterior prob
+    idx <- which(denominator == 0)
+    if (length(idx) > 0) posteriorProb[idx, ] <- matrix(mixtureModel$eta, nrow = length(idx), ncol = length(mixtureModel$eta), byrow = T)
+    predictedMixtureComponent <- apply(posteriorProb, 1, which.max)
+    return(predictedMixtureComponent)
 }
