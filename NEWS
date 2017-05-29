@@ -1,3 +1,10 @@
+MethylMix v2.5-1 (Release date: 2017-05-29)
+==============
+
+Changes:
+
+* Fixed problem with example of function MethylMix_Predict
+
 MethylMix v2.4-0 (Release date: 2017-05-25)
 ==============
 
