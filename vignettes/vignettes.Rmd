@@ -134,6 +134,18 @@ saveRDS(toSave, file = paste0(targetDirectory, "data_", cancerSite, ".rds"))
 stopCluster(cl)
 ```
 
+For user supplied data not from TCGA, the user can provide DNA methylation beta-values(normal and cancer) and gene expression data in the form of a data.matrix object in R with the rows corresponding to the genes and the columns to the sample. Once the three matrices: METcancer, METnormal and GEnormal are created, the last step is to cluster the methylation data:
+
+```{r, eval=FALSE, tidy=TRUE}
+METcancer = matrix(data = methylation_data, nrow = nb_of_genes, ncol = nb_of_samples)
+METnormal = matrix(data = methylation_data, nrow = nb_of_genes, ncol = nb_of_samples)
+GEcancer = matrix(data = expression_data, nrow = nb_of_genes, ncol = nb_of_samples)
+ClusterProbes(MET_Cancer, MET_Normal, CorThreshold = 0.4)
+```
+
+If the data contains batches, the user must provide numeric batch data within the matrices. MethylMix can be applied on all illumina arrays, including the newly released Epic platform and any array that outputs beta values. At the moment there are no restrictions to input sequencing-based methylation data, if the data is formatted in proportions however, as mixture modeling is computationally expensive, Methylmix will require more time to finish.
+
+
 ## 4. Data input for MethylMix
 
 To run MethylMix three data sets of a particular disease are required. The first one is 
