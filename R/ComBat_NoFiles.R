@@ -27,7 +27,7 @@ NULL
 #' @return Results.
 #' @keywords internal
 #'
-ComBat_NoFiles <- function(dat, saminfo, type='txt', write=F, covariates='all', par.prior=T, filter=F, skip=0, prior.plots=T){
+ComBat_NoFiles <- function(dat, saminfo, type='txt', write=F, covariates='all', par.prior=F, filter=F, skip=0, prior.plots=T){
      #debug: expression_xls='exp.txt'; sample_info_file='sam.txt'; type='txt'; write=T; covariates='all'; par.prior=T; filter=F; skip=0; prior.plots=T
     
     # 'expression_xls' is the expression index file (e.g. outputted by dChip). I think it was replaced by dat, a matrix

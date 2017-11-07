@@ -1,3 +1,12 @@
+MethylMix v2.8-0 (Release date: 2017-11-05)
+==============
+
+Changes:
+
+* Updated vignettes
+* Implemented non-parametric batch correction
+
+
 MethylMix v2.5-1 (Release date: 2017-05-29)
 ==============
 
