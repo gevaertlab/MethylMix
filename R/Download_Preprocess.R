@@ -165,21 +165,21 @@ get_firehoseData <- function(downloadData=TRUE,
                              printDisease_abbr=FALSE){  
     
     # Cases Shipped by BCR  # Cases with Data*  Date Last Updated (mm/dd/yy)
-    cancers <- c("Acute Myeloid Leukemia [LAML] \n","Adrenocortical carcinoma [ACC]	\n",
-                 "Bladder Urothelial Carcinoma [BLCA] \n",	"Brain Lower Grade Glioma [LGG] \n",
+    cancers <- c("Acute Myeloid Leukemia [LAML] \n","Adrenocortical carcinoma [ACC] \n",
+                 "Bladder Urothelial Carcinoma [BLCA] \n",  "Brain Lower Grade Glioma [LGG] \n",
                  "Breast invasive carcinoma [BRCA] \n","Cervical squamous cell carcinoma and endocervical adenocarcinoma [CESC] \n",
-                 "Cholangiocarcinoma [CHOL] \n",	"Colon adenocarcinoma [COAD] \n",	"Esophageal carcinoma [ESCA] \n",
-                 "Glioblastoma multiforme [GBM] \n",	"Head and Neck squamous cell carcinoma [HNSC]	\n",
-                 "Kidney Chromophobe [KICH]	\n","Kidney renal clear cell carcinoma [KIRC]	\n",
-                 "Kidney renal papillary cell carcinoma [KIRP]	\n","Liver hepatocellular carcinoma [LIHC]	\n",
-                 "Lung adenocarcinoma [LUAD]	\n", "Lung squamous cell carcinoma [LUSC] \n",
-                 "Lymphoid Neoplasm Diffuse Large B-cell Lymphoma [DLBC]	\n","Mesothelioma [MESO] \n",
-                 "Ovarian serous cystadenocarcinoma [OV]	\n","Pancreatic adenocarcinoma [PAAD]	\n",
+                 "Cholangiocarcinoma [CHOL] \n",    "Colon adenocarcinoma [COAD] \n",   "Esophageal carcinoma [ESCA] \n",
+                 "Glioblastoma multiforme [GBM] \n",    "Head and Neck squamous cell carcinoma [HNSC]   \n",
+                 "Kidney Chromophobe [KICH] \n","Kidney renal clear cell carcinoma [KIRC]   \n",
+                 "Kidney renal papillary cell carcinoma [KIRP]  \n","Liver hepatocellular carcinoma [LIHC]  \n",
+                 "Lung adenocarcinoma [LUAD]    \n", "Lung squamous cell carcinoma [LUSC] \n",
+                 "Lymphoid Neoplasm Diffuse Large B-cell Lymphoma [DLBC]    \n","Mesothelioma [MESO] \n",
+                 "Ovarian serous cystadenocarcinoma [OV]    \n","Pancreatic adenocarcinoma [PAAD]   \n",
                  "Pheochromocytoma and Paraganglioma [PCPG] \n","Prostate adenocarcinoma [PRAD] \n",
-                 "Rectum adenocarcinoma [READ]	\n","Sarcoma [SARC]	\n","Skin Cutaneous Melanoma [SKCM]	\n",
+                 "Rectum adenocarcinoma [READ]  \n","Sarcoma [SARC] \n","Skin Cutaneous Melanoma [SKCM] \n",
                  "Stomach adenocarcinoma [STAD] \n","Testicular Germ Cell Tumors [TGCT] \n","Thymoma [THYM] \n",
-                 "Thyroid carcinoma [THCA]	\n","Uterine Carcinosarcoma [UCS]	 \n",
-                 "Uterine Corpus Endometrial Carcinoma [UCEC]	\n","Uveal Melanoma [UVM] \n", "Colorectal Adenocarcinoma [COADREAD] \n")
+                 "Thyroid carcinoma [THCA]  \n","Uterine Carcinosarcoma [UCS]    \n",
+                 "Uterine Corpus Endometrial Carcinoma [UCEC]   \n","Uveal Melanoma [UVM] \n", "Colorectal Adenocarcinoma [COADREAD] \n")
     
     if(printDisease_abbr){      
         return(cat("here are the possible TCGA database disease acronyms. \nRe-run this function with printDisease_abbr=FALSE to then run an actual query.\n\n",cancers));      
@@ -201,28 +201,28 @@ get_firehoseData <- function(downloadData=TRUE,
     
     #remove any FFPE datasets, or only keep those depending on user inputs.
     if (FFPE) { 
-        urlData <- urlData[grep("FFPE",urlData)]	
-        if(length(urlData)==0){		
-            stop("\nNo FFPE data found for this query. Try FFPE=FALSE.\n")		
-        }	  
-    } else {	
+        urlData <- urlData[grep("FFPE",urlData)]    
+        if(length(urlData)==0){     
+            stop("\nNo FFPE data found for this query. Try FFPE=FALSE.\n")      
+        }     
+    } else {    
         #we DON'T want FFPE data.
         #but if no FFPE data to begin with: don't subset on this.
-        if(length(grep("FFPE",urlData))>0){		
-            urlData <- urlData[-grep("FFPE",urlData)]		
+        if(length(grep("FFPE",urlData))>0){     
+            urlData <- urlData[-grep("FFPE",urlData)]       
         }
-        if(length(urlData)==0){		
-            stop("\nNo non-FFPE data found for this query. Try FFPE=TRUE.\n")		
+        if(length(urlData)==0){     
+            stop("\nNo non-FFPE data found for this query. Try FFPE=TRUE.\n")       
         }
     }
     #now get full dataset name.
     fileName <- urlData[grep(dataFileTag,urlData)]
     
-    if(length(fileName)==0){	  
+    if(length(fileName)==0){      
         #warnMessage <- paste0("\nNot returning any viable url data paths after searching by date for disease ",TCGA_acronym_uppercase," for data type ",dataFileTag ,".No data was downloaded.\n")
         #warning(warnMessage)
         cat("\tThere is no",dataFileTag,"data for",TCGA_acronym_uppercase,"\n")
-        return(NA)	  
+        return(NA)    
     }
     #some redundancy..but that' OK because we'll add back on the unique tar.gz file tag.
     #first file is one we want - not md5 file.
@@ -238,24 +238,24 @@ get_firehoseData <- function(downloadData=TRUE,
         # Not Windows
         tarfile=paste0(saveDir,fileName)
         finalDir <-  strsplit(tarfile, paste0(".", fileType))[[1]][1]
-        if(downloadData){		
-            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")				
+        if(downloadData){       
+            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")             
             cat("\tThis may take 10-60 minutes depending on the size of the data set.\n")
             dir.create(saveDir,showWarnings=FALSE)
-            # download file		
-            setwd(saveDir)				
+            # download file     
+            setwd(saveDir)              
             download.file(gdacURL,fileName,quiet=FALSE,mode="wb")
             #this assumes a tar.gz file.
-            if(fileType=="tar.gz" && untarUngzip) {					
+            if(fileType=="tar.gz" && untarUngzip) {                 
                 cat("\tUnpacking data.\n")
                 tarfile=paste0(saveDir,fileName)
                 untar(tarfile)
                 #remove tarred file
                 fileToRemove <- limma::strsplit2(gdacURL,"/")[ ,ncol(limma::strsplit2(gdacURL,"/"))]
                 removed <- file.remove(paste0(saveDir,fileToRemove))
-            } else if(untarUngzip) {		
-                warning("File expansion/opening only built in for tar.gz files at the moment.\n")		
-            }		
+            } else if(untarUngzip) {        
+                warning("File expansion/opening only built in for tar.gz files at the moment.\n")       
+            }       
             cat("\tFinished downloading",dataFileTag,"data to",finalDir,"\n")
         } else {
             cat("\tdownload data url is :\n ",gdacURL,'\n')
@@ -275,7 +275,7 @@ get_firehoseData <- function(downloadData=TRUE,
         nameForDownloadedFileFullPath <- paste0(saveDir, nameForDownloadedFile)
         finalDir <- paste0(saveDir, nameForFolder)
         if (downloadData) {
-            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")				
+            cat("\tDownloading",dataFileTag,"data, version:",lastDate,"\n")             
             cat("\tThis may take 10-60 minutes depending on the size of the data set.\n")
             dir.create(saveDir, showWarnings = FALSE)
             
@@ -286,7 +286,7 @@ get_firehoseData <- function(downloadData=TRUE,
             
             download.file(gdacURL, destfile = paste0("x://", nameForDownloadedFile), quiet = FALSE, mode = "wb")
             #this assumes a tar.gz file.
-            if(fileType == "tar.gz" && untarUngzip) {					
+            if(fileType == "tar.gz" && untarUngzip) {                   
                 cat("\tUnpacking data.\n")
                 untar(nameForDownloadedFileFullPath, exdir = saveDir)
                 # untar(paste0("x://", nameForDownloadedFile), exdir = "x://") # doesn't work because it calls system and system doesnt know about the virtual drive
@@ -294,8 +294,8 @@ get_firehoseData <- function(downloadData=TRUE,
                 # Anyway I change folder name to make it shorter
                 changed <- file.rename(from = paste0("x://", gsub(".tar.gz", "", fileName)), to = paste0("x://", nameForFolder))
                 system("subst x: /D") # stop the virtual drive
-            } else if(untarUngzip) {		
-                warning("File expansion/opening only built in for tar.gz files at the moment.\n")		
+            } else if(untarUngzip) {        
+                warning("File expansion/opening only built in for tar.gz files at the moment.\n")       
             }
             cat("\tFinished downloading", dataFileTag, "data to", finalDir,"\n")
         } else {
@@ -976,22 +976,22 @@ Download_GeneExpression <- function(CancerSite,TargetDirectory,downloadData=TRUE
     TCGA_acronym_uppercase=toupper(CancerSite)
     
     # get RNA seq data (GBM does not have much RNAseq data.)
-    dataType='stddata'	
-    dataFileTag='mRNAseq_Preprocess.Level_3'	 
+    dataType='stddata'  
+    dataFileTag='mRNAseq_Preprocess.Level_3'     
     
     #special case for GBM and OV, not enough RNAseq data, so using the microarray data instead
-    if (CancerSite=="GBM") { 	             
-        dataFileTag=c('Merge_transcriptome__agilentg4502a_07_1__unc_edu__Level_3__unc_lowess_normalization_gene_level__data','Merge_transcriptome__agilentg4502a_07_2__unc_edu__Level_3__unc_lowess_normalization_gene_level__data')        	         
-    } else if(CancerSite=="OV") {	               
+    if (CancerSite=="GBM") {                 
+        dataFileTag=c('Merge_transcriptome__agilentg4502a_07_1__unc_edu__Level_3__unc_lowess_normalization_gene_level__data','Merge_transcriptome__agilentg4502a_07_2__unc_edu__Level_3__unc_lowess_normalization_gene_level__data')                     
+    } else if(CancerSite=="OV") {                  
         dataFileTag='Merge_transcriptome__agilentg4502a_07_3__unc_edu__Level_3__unc_lowess_normalization_gene_level__data'        
-    }	
+    }   
     cat('Searching MA data for:',CancerSite,"\n")
-    if (length(dataFileTag)==1) {	  
-        MAdirectories=get_firehoseData(downloadData,saveDir=TargetDirectory,TCGA_acronym_uppercase=TCGA_acronym_uppercase,dataFileTag=dataFileTag)    	
-    } else {	    # a few data sets have multiple gene expression data sets. 
-        MAdirectories=c()	  
+    if (length(dataFileTag)==1) {     
+        MAdirectories=get_firehoseData(downloadData,saveDir=TargetDirectory,TCGA_acronym_uppercase=TCGA_acronym_uppercase,dataFileTag=dataFileTag)      
+    } else {        # a few data sets have multiple gene expression data sets. 
+        MAdirectories=c()     
         for (i in 1:length(dataFileTag)) {
-            MAdirectories=c(MAdirectories,get_firehoseData(downloadData,saveDir=TargetDirectory,TCGA_acronym_uppercase=TCGA_acronym_uppercase,dataFileTag=dataFileTag[i]))	 
+            MAdirectories=c(MAdirectories,get_firehoseData(downloadData,saveDir=TargetDirectory,TCGA_acronym_uppercase=TCGA_acronym_uppercase,dataFileTag=dataFileTag[i]))   
         }        
     }
     
@@ -1061,7 +1061,7 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
     }
     
     #cat("Loading mRNA data.\n")
-    if (length(MAdirectories)>1) {      		
+    if (length(MAdirectories)>1) {              
         cat("\tFound multiple MA data sets.\n")
         DataSetsCancer=list()
         GeneListsCancer=list()
@@ -1347,6 +1347,37 @@ TCGA_GENERIC_MergeData <-function(NewIDListUnique, DataMatrix) {
 #' @export
 #' @keywords cluter_probes
 #' @importFrom foreach %dopar%
+#' @examples 
+#' \dontrun{
+#' 
+#' # Optional register cluster to run in parallel
+#' library(doParallel)
+#' cl <- makeCluster(5)
+#' registerDoParallel(cl)
+#' 
+#' # Methylation data for ovarian cancer
+#' cancerSite <- "OV"
+#' targetDirectory <- paste0(getwd(), "/")
+#' 
+#' # Downloading methylation data
+#' METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
+#' 
+#' # Processing methylation data
+#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
+#' 
+#' # Saving methylation processed data
+#' saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
+#' 
+#' # Clustering methylation data
+#' res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+#' 
+#' # Saving methylation clustered data
+#' toSave <- list(METcancer = res[[1]], METnormal = res[[2]], ProbeMapping = res$ProbeMapping)
+#' saveRDS(toSave, file = paste0(targetDirectory, "MET_", cancerSite, "_Clustered.rds"))
+#' 
+#' stopCluster(cl)
+#' }
+#'  
 ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
     
     # Top level function that implements an equivalent cluster algorithm but using hierarchical clustering with complete linkage. 

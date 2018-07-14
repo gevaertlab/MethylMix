@@ -25,4 +25,3 @@ The data matrix.
 Internal. Pre-process gene expression data for cancer samples.
 }
 \keyword{internal}
-

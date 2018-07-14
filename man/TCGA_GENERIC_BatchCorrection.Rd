@@ -18,4 +18,3 @@ The corrected data matrix.
 Internal. Performs batch correction.
 }
 \keyword{internal}
-

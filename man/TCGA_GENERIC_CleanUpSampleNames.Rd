@@ -18,4 +18,3 @@ data matrix with cleaned sample names.
 Internal. Cleans the samples IDs into the 12 digit format and removes doubles.
 }
 \keyword{internal}
-

@@ -8,4 +8,3 @@
 Data set with batch number for TCGA samples.
 }
 \keyword{datasets}
-

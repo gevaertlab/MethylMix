@@ -25,4 +25,3 @@ List with the clustered data sets and the mapping between probes and genes.
 Internal. Cluster probes into genes.
 }
 \keyword{internal}
-

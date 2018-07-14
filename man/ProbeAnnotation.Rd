@@ -8,4 +8,3 @@
 Data set with annotation from Illumina methylatin arrays mapping CpG sites to genes.
 }
 \keyword{datasets}
-

@@ -16,4 +16,3 @@ a list.
 Internal. Looks for the group of the samples (normal/cancer).
 }
 \keyword{internal}
-

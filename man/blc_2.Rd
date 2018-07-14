@@ -26,4 +26,3 @@ A list of parameters representing mixture model fit, including posterior weights
 Internal. Fits a beta mixture model for any number of classes. Adapted from RPMM package.
 }
 \keyword{internal}
-
