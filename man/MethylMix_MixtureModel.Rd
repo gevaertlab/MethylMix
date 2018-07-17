@@ -33,4 +33,3 @@ Classifications a vector indicating to which component each sample was assigned.
 Internal. Prepares all the structures to store the results and calls in a foreach loop a function that fits the mixture model in each gene.
 }
 \keyword{internal}
-

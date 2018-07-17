@@ -18,4 +18,3 @@ list with results.
 Internal. Checks if batch correction is needed.
 }
 \keyword{internal}
-

@@ -38,4 +38,3 @@ DownloadedFile path to directory with downloaded files.
 Gets data from TCGA's firehose.
 }
 \keyword{internal}
-
