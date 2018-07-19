@@ -58,9 +58,9 @@ NULL
 #' for homogeneous subpopulations. In addition matched gene expression data (e.g. from microarray technology or RNA sequencing) 
 #' is used to identify functional DNA methylation events by requiring a negative correlation between methylation 
 #' and gene expression of a particular gene. See references below.
-#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns.
-#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
+#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
 #' @param listOfGenes Vector with genes names to be evaluated, names must coincide with the names of the rows of METcancer.
 #' @param filter Logical indicating if the linear regression to select genes with significative linear negative relation between methylation and gene expression should be performed (default: TRUE).
 #' @param NoNormalMode Logical indicating if the methylation states found in the cancer samples should be compared to the normal samples (default: FALSE).
@@ -77,11 +77,11 @@ NULL
 #' \item{Models}{Beta mixture model parameters for each driver gene.}
 #' @export
 #' @references 
-#' Gevaert 0. \href{https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv020}{MethylMix: an R package for identifying DNA methylation-driven genes}. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020.
+#' Gevaert O. \href{https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv020}{MethylMix: an R package for identifying DNA methylation-driven genes}. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020.
 #' 
 #' Gevaert O, Tibshirani R, Plevritis SK. \href{http://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0579-8}{Pancancer analysis of DNA methylation-driven genes using MethylMix}. Genome Biology. 2015;16(1):17. doi:10.1186/s13059-014-0579-8.
 #'
-#' Pierre-Louis Cedoz, Marcos Prunello, Kevin Brennan, Olivier Gevaert; MethylMix 2.0: an R package for identifying DNA methylation genes. Bioinformatics. doi:10.1093/bioinformatics/bty156.
+#' Pierre-Louis Cedoz, Marcos Prunello, Kevin Brennan, Olivier Gevaert. \href{https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/bty156/4970512}{MethylMix 2.0: an R package for identifying DNA methylation genes}. Bioinformatics. 2018 Apr 14. doi:10.1093/bioinformatics/bty156.
 #' @examples
 #' # load the three data sets needed for MethylMix
 #' data(METcancer)
@@ -106,7 +106,8 @@ MethylMix <- function(METcancer,
                       listOfGenes = NULL, 
                       filter = TRUE,
                       NoNormalMode = FALSE, 
-                      OutputRoot='') { 
+                      OutputRoot='',
+                      PatientData = NULL) { 
     
     if (missing(METcancer)) stop("Need to provide METcancer matrix")
     if (missing(GEcancer)) stop("Need to provide GEcancer matrix")
@@ -144,6 +145,12 @@ MethylMix <- function(METcancer,
     }
     
     ### Step 3: write output to file
+    ## Combining patient data, if avaliable
+    if (!is.null(PatientData)) {
+        DM_SE <- SummarizedExperiment::SummarizedExperiment(MixtureModelResults$MethylationStates, colData=PatientData[colnames(MixtureModelResults$MethylationStates),])
+        MixtureModelResults$MethylationStates <- DM_SE
+    }
+
     if (OutputRoot != "") {
         saveRDS(MixtureModelResults, file = paste0(OutputRoot, "MethylMix_Results.rds"))
     }
@@ -659,12 +666,11 @@ betaEst_2 <-function (Y, w, weights) {
 #' Produces plots to represent MethylMix's output.
 #' @param GeneName Name of the gene for which to create a MethylMix plot.
 #' @param MixtureModelResults List returned by MethylMix function.
-#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns (optional).
-#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
+#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
 #' @return a list with MethylMix plots, a histogram of the methylation data (MixtureModelPlot) and a scatterplot between DNA methylation and gene expression
 #' (CorrelationPlot, is NULL if gene expression data is not provided). Both plots show the different mixture components identified.
-#' @import ggplot2
 #' @export
 #' @examples
 #' # Load the three data sets needed for MethylMix

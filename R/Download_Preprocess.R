@@ -3,7 +3,7 @@
 #' This function wraps the functions for downloading and pre-processing DNA methylation and gene expression data,
 #' as well as for clustering CpG probes.
 #' @param cancerSite character of length 1 with TCGA cancer code.
-#' @param targetDirectory character with directory where a folder for downloaded files will be created.
+#' @param targetDirectory character with directory where files will be saved (default is current working directory).
 #' @export
 #' @keywords download preprocess cluster
 #' @details
@@ -25,7 +25,6 @@
 #' This function also cleans up the sample names, converting them to the 12 digit format.
 #' @return The following files will be created in target directory:
 #' \itemize{
-#'  \item \code{gdac}: a folder with the raw data downloaded from TCGA.
 #'  \item \code{MET_CancerSite_Processed.rds}: processed methylation data at the CpG sites level (not clustered).
 #'  \item \code{GE_CancerSite_Processed.rds}: processed gene expression data.
 #'  \item \code{data_CancerSite.rds}: list with both gene expression and methylation data. Methylation data is clustered and presented at the gene level. A matrix with the mapping from CpG sites to genes is included.
@@ -49,41 +48,41 @@
 #' stopCluster(cl)
 #' }
 #'
-GetData <- function(cancerSite, targetDirectory) {
+GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
+
+    # Download
+    cat("Downloading methylation and gene expression MAE object for:", cancerSite, "\n")
+    MAEO <- Download_Data(cancerSite)
     
     # Methylation
-    cat("Downloading methylation data for:", cancerSite, "\n")
-    METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
     cat("Processing methylation data for:", cancerSite, "\n")
-    METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
+    METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
     cat("Saving methylation processed data for:", cancerSite, "\n")
     saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
     
     # Gene expression
-    cat("Downloading gene expression data for:", cancerSite, "\n")
-    GEdirectories <- Download_GeneExpression(cancerSite, targetDirectory, TRUE)
     cat("Processing gene expression data for:", cancerSite, "\n")
-    GEProcessedData <- Preprocess_GeneExpression(cancerSite, GEdirectories)
+    GEProcessedData <- Preprocess_GeneExpression(cancerSite, MAEO)
     cat("Saving gene expression processed data for:", cancerSite, "\n")
     saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", cancerSite, "_Processed.rds"))
     
     # Clustering probes to genes
     cat("Clustering methylation data for:", cancerSite, "\n")
-    res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+    MAEO_Probes <- Pull_Probe_Annotation(MAEO)
+    res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]], MAEO_Probes=MAEO_Probes)
     
     # Putting everything together
     cat("Saving data\n")
-    toSave <- list(METcancer = res[[1]], METnormal = res[[2]], GEcancer = GEProcessedData[[1]], GEnormal = GEProcessedData[[2]], ProbeMapping = res$ProbeMapping)
+    toSave <- list(METcancer = res[[1]], METnormal = res[[2]], GEcancer = GEProcessedData[[1]], GEnormal = GEProcessedData[[2]], ProbeMapping = res$ProbeMapping, PatientData = colData(MAEO))
     saveRDS(toSave, file = paste0(targetDirectory, "data_", cancerSite, ".rds"))
 }
 
-#' The Download_DNAmethylation function
-#' 
-#' Downloads DNA methylation data from TCGA.
+#' The Download_Data function
+#'
+#' Downloads methylation and gene expression data from TCGA through the curatedTCGAData package.
+#'
 #' @param CancerSite character of length 1 with TCGA cancer code.
-#' @param TargetDirectory character with directory where a folder for downloaded files will be created.
-#' @param downloadData logical indicating if data should be downloaded (default: TRUE). If false, the url of the desired data is returned.
-#' @return list with paths to downloaded files for both 27k and 450k methylation data.
+#' @return MultiAssayExperiment with the methylation and gene expression data for the cancerSite.
 #' @export
 #' @keywords download
 #' @examples 
@@ -96,10 +95,9 @@ GetData <- function(cancerSite, targetDirectory) {
 #' 
 #' # Methylation data for ovarian cancer
 #' cancerSite <- "OV"
-#' targetDirectory <- paste0(getwd(), "/")
 #' 
-#' # Downloading methylation data
-#' METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
+#' # Downloading data
+#' MAEO <- Download_Data(cancerSite)
 #' 
 #' # Processing methylation data
 #' METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
@@ -117,9 +115,108 @@ GetData <- function(cancerSite, targetDirectory) {
 #' stopCluster(cl)
 #' }
 #'  
+Download_Data <- function(cancerSite) {
+
+    #download all relevant data in one query
+    assays <- c()
+    #add methylation
+    assays <- c(assays, "Methylation")
+    #add gene expression
+    if (cancerSite=="OV" || cancerSite=="GBM") {
+        # TODO: why is this data tag important? -> use [[2]] ?      
+        # TODO: dataFileTag=c('Merge_transcriptome__agilentg4502a_07_1__unc_edu__Level_3__unc_lowess_normalization_gene_level__data','Merge_transcriptome__agilentg4502a_07_2__unc_edu__Level_3__unc_lowess_normalization_gene_level__data')      
+        assays <- c(assays, "mRNAArray")  
+    } else if (cancerSite=="STAD" || cancerSite=="ESCA") { # for these cancers RSEM data does not exist. 
+            assays <- c(assays, "RNASeq2GeneNorm")
+    } else {
+        assays <- c(assays, "RNASeq2GeneNorm")
+    }
+
+    #run the query
+    MAEO <- curatedTCGAData::curatedTCGAData(cancerSite, assays, FALSE)
+
+    return(MAEO)
+}
+
+#' The Pull_Probe_Annotation function
+#'
+#' Extracts and processes probe annotation data from the methylation assays of the MultiAssayExperiment
+#' object.
+#'
+#' @param MAEO MultiAssayExperiment object containing 27k and 450k methylation assays
+#' @return matrix with probe to gene annotation
+#' @export
+#' @keywords preprocess
+#' @examples 
+#' \dontrun{
+#'
+#' cancerSite <- "OV"
+#' MAEO <- Download_Data(cancerSite)
+#' MAEO_Probes <- Pull_Probe_Annotation(MAEO)
+#'
+#' }
+#'  
+Pull_Probe_Annotation <- function(MAEO) {
+    #expects MAE object with 27k and 450k methylation data
+    probes <- as.matrix(rowData(MAEO[[1]])[,1])
+    probes2 <- as.matrix(rowData(MAEO[[2]])[,1])
+    rownames(probes) <- as.character(rownames(MAEO[[1]]))
+    rownames(probes2) <- as.character(rownames(MAEO[[2]]))
+
+    probes <- cbind(rownames(MAEO[[1]]),rowData(MAEO[[1]])[,1])
+    probes2 <- cbind(rownames(MAEO[[2]]),rowData(MAEO[[2]])[,1])
+    probes_all <- data.frame(rbind(probes,probes2), stringsAsFactors=FALSE)
+
+    colnames(probes_all) <- c("ILMNID", "GENESYMBOL")
+
+    return(probes_all)
+}
+
+#' The Download_DNAmethylation function
+#' 
+#' Downloads DNA methylation data from TCGA. Note this is a legacy function as of version 2.12.0. 
+#' Downloading is mediated by the curatedTCGAData package within the GetData() function.
+#' @param CancerSite character of length 1 with TCGA cancer code.
+#' @param TargetDirectory character with directory where a folder for downloaded files will be created.
+#' @param downloadData logical indicating if data should be downloaded (default: TRUE). If false, the url of the desired data is returned.
+#' @return list with paths to downloaded files for both 27k and 450k methylation data.
+#' @export
+#' @keywords download
+#' @examples 
+#' \dontrun{
+#' 
+#' # Optional register cluster to run in parallel
+#' library(doParallel)
+#' cl <- makeCluster(5)
+#' registerDoParallel(cl)
+#' 
+#' # Methylation data for ovarian cancer
+#' cancerSite <- "OV"
+#' 
+#' # Downloading data
+#' MAEO <- Download_Data(cancerSite)
+#' 
+#' # Processing methylation data
+#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
+#' 
+#' # Saving methylation processed data
+#' saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
+#' 
+#' # Clustering methylation data
+#' res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+#' 
+#' # Saving methylation clustered data
+#' toSave <- list(METcancer = res[[1]], METnormal = res[[2]], ProbeMapping = res$ProbeMapping)
+#' saveRDS(toSave, file = paste0(targetDirectory, "MET_", cancerSite, "_Clustered.rds"))
+#' 
+#' stopCluster(cl)
+#' }
 Download_DNAmethylation <- function(CancerSite, 
                                     TargetDirectory, 
-                                    downloadData = TRUE) {    
+                                    downloadData = TRUE) {  
+
+    .Deprecated("Download_Data")
+    ## use Download_Data() in order to download assays as of 2.12.0
     
     dir.create(TargetDirectory,showWarnings=FALSE)
     
@@ -307,12 +404,11 @@ get_firehoseData <- function(downloadData=TRUE,
     }
 }
 
-
 #' The Preprocess_DNAmethylation function
 #' 
 #' Pre-processes DNA methylation data from TCGA.
 #' @param CancerSite character of length 1 with TCGA cancer code.
-#' @param METdirectories character vector with directories with the downloaded data. It can be the object returned by the Download_DNAmethylation function.
+#' @param MAEO MultiAssayExperiment object containing all the relevant experiments; methylation data is extracted out
 #' @param MissingValueThreshold threshold for removing samples or genes with missing values.
 #' @details 
 #' Pre-process includes eliminating samples and genes with too many NAs, imputing NAs, and doing Batch correction.
@@ -332,13 +428,12 @@ get_firehoseData <- function(downloadData=TRUE,
 #' 
 #' # Methylation data for ovarian cancer
 #' cancerSite <- "OV"
-#' targetDirectory <- paste0(getwd(), "/")
 #' 
-#' # Downloading methylation data
-#' METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
+#' # Downloading data
+#' MAEO <- Download_Data(cancerSite)
 #' 
 #' # Processing methylation data
-#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
+#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
 #' 
 #' # Saving methylation processed data
 #' saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
@@ -352,20 +447,32 @@ get_firehoseData <- function(downloadData=TRUE,
 #' 
 #' stopCluster(cl)
 #' }
-#' 
-Preprocess_DNAmethylation <- function(CancerSite, METdirectories, MissingValueThreshold = 0.2) {    
-    
+Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 0.2) {    
+    ##### MAE additions -Lucas #####
+    #
+    #extract 27k and 450k
+    MAEO_27k <- as.matrix(assay(MAEO[[paste(CancerSite,"_Methylation_methyl27-20160128", sep='')]]))
+    rws <- rownames(MAEO_27k)
+    MAEO_27k <- apply(MAEO_27k, 2, as.numeric)
+    rownames(MAEO_27k) <- rws
+
+    MAEO_450k <- as.matrix(assay(MAEO[[paste(CancerSite,"_Methylation_methyl450-20160128", sep='')]]))
+    rws <- rownames(MAEO_450k)
+    MAEO_450k <- apply(MAEO_450k, 2, as.numeric)
+    rownames(MAEO_450k) <- rws
+    ################################
+
     cat("\tProcessing data for",CancerSite,"\n")
     ProcessedData27k=c()
     ProcessedData450k=c()
-    if (!is.na(METdirectories$METdirectory27k)) {
+    if (!is.null(MAEO_27k)) {
         cat('\tLoading data for 27k.\n')
-        ProcessedData27k=Preprocess_CancerSite_Methylation27k(CancerSite,METdirectories$METdirectory27k, MissingValueThreshold)
+        ProcessedData27k=Preprocess_CancerSite_Methylation27k(CancerSite,MAEO_27k,MissingValueThreshold)
     }
     
-    if (!is.na(METdirectories$METdirectory450k)) {
+    if (!is.null(MAEO_450k)) {
         cat('\tLoading data for 450k.\n')
-        ProcessedData450k=Preprocess_CancerSite_Methylation450k(CancerSite,METdirectories$METdirectory450k, MissingValueThreshold)
+        ProcessedData450k=Preprocess_CancerSite_Methylation450k(CancerSite,MAEO_450k,MissingValueThreshold)
     }
     
     # check if we want to combine 27k and 450k
@@ -397,30 +504,30 @@ Preprocess_DNAmethylation <- function(CancerSite, METdirectories, MissingValueTh
                 ProcessedData$MET_Data_Normal=ProcessedData27k$MET_Data_Normal                    
             } else if ( length(colnames(ProcessedData450k$MET_Data_Normal))>0 ) {
                 ProcessedData$MET_Data_Normal=ProcessedData450k$MET_Data_Normal                    
-            } 
+            }
             
             # Batch correction on combined Tumor data.
             Batch=matrix(1,length(colnames(ProcessedData$MET_Data_Cancer)),1)
             Batch[1:length(colnames(ProcessedData27k$MET_Data_Cancer)),1]=2
             BatchData=data.frame(ArrayName=colnames(ProcessedData$MET_Data_Cancer),SampleName=colnames(ProcessedData$MET_Data_Cancer),Batch=Batch)
-            ProcessedData$MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Cancer,BatchData,0)
+            #ProcessedData$MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Cancer,BatchData,0)
             
             if (length(colnames(ProcessedData$MET_Data_Normal))>0) {
                 # Batch correction on combined Normal data.
                 Batch=matrix(1,length(colnames(ProcessedData$MET_Data_Normal)),1)
                 Batch[1:length(colnames(ProcessedData27k$MET_Data_Normal)),1]=2
                 BatchData=data.frame(ArrayName=colnames(ProcessedData$MET_Data_Normal),SampleName=colnames(ProcessedData$MET_Data_Normal),Batch=Batch)
-                ProcessedData$MET_Data_Normal=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Normal,BatchData,5)
+                #ProcessedData$MET_Data_Normal=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Normal,BatchData,5)
             }               
             
         } else if (ncol(ProcessedData27k$MET_Data_Cancer)>ncol(ProcessedData450k$MET_Data_Cancer)) { 
             cat("\tNot enough 450k samples, only using the 27k (need min 50 samples).\n")
             Mode='27k'
-            ProcessedData=ProcessedData27k          
+            ProcessedData=ProcessedData27k        
         } else {
             cat("\tNot enough 27k samples, only using the 450k (need min 50 samples).\n")
             Mode='450k'
-            ProcessedData=ProcessedData450k     
+            ProcessedData=ProcessedData450k 
         }
     } else if (CancerSite == "LAML") {
         cat("\tLAML is a special case, only using 450k data.\n")
@@ -437,48 +544,30 @@ Preprocess_DNAmethylation <- function(CancerSite, METdirectories, MissingValueTh
         Mode='450k'
         ProcessedData=ProcessedData450k          
     }     
+
     return(ProcessedData=ProcessedData)
 }
 
 #' The Preprocess_CancerSite_Methylation27k function
 #' 
-#' Internal. Pre-processes DNA methylation data from TCGA from Illymina 27k arrays.
+#' Internal. Pre-processes DNA methylation data from TCGA from Illumina 27k arrays.
 #' @param CancerSite character of length 1 with TCGA cancer code.
-#' @param METdirectory character with directory where a folder for downloaded files will be created. Can be the object returned by the Download_DNAmethylation function.
+#' @param MAEO_27k matrix of methylation data extracted from the main MultiAssayExperiment object
 #' @param MissingValueThreshold threshold for removing samples or genes with missing values.
 #' @return List with pre processed methylation data for cancer and normal samples.
 #' @keywords internal
 #'
-Preprocess_CancerSite_Methylation27k <- function(CancerSite, METdirectory, MissingValueThreshold = 0.2) {
+Preprocess_CancerSite_Methylation27k <- function(CancerSite, MAEO_27k, MissingValueThreshold = 0.2) {
     
+    ##### MAE additions -Lucas #####
+    #at this point, MAEO_27k should mirror the eventual MET_Data; skipping below
+    MET_Data <- MAEO_27k
+    ################################
+
     # Settings
     get("BatchData")
     MinPerBatch=5
-    
-    if (grepl("Windows", Sys.info()['sysname'])) {
-        # If Windows I'll create a virtual drive to handle the long file names issue
-        # Create a virtual drive to overcome long names issue in Windows
-        virtualDir <- METdirectory
-        virtualDir <- gsub("\\\\", "/", virtualDir)
-        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
-        system(paste("subst x:", virtualDir))
-        
-        # Load data
-        METfiles <- dir("x:")
-        MatchedFilePosition <- grep('methylation__humanmethylation27', METfiles)             
-        Filename <- paste0("x://", METfiles[MatchedFilePosition])          
-        MET_Data <- TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
-        
-        system("subst x: /D") #stop virtual drive
-    } else {
-        # Not windows
-        # Load data
-        METfiles=dir(METdirectory)
-        MatchedFilePosition=grep('methylation__humanmethylation27',METfiles)             
-        Filename=paste0(METdirectory,METfiles[MatchedFilePosition])          
-        MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
-    }
-    
+
     # Split up normal and cancer data
     Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MET_Data))
     if (CancerSite=='LAML') {
@@ -508,12 +597,12 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, METdirectory, Missi
     # Batch correction for cancer and normal. 
     cat("\tBatch correction for the cancer samples.\n")
     BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Cancer,BatchData)
-    MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
+    #MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
     
     if (length(MET_Data_Normal)>0) {
         cat("\tBatch correction for the normal samples.\n")
         BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Normal,BatchData)
-        MET_Data_Normal=TCGA_BatchCorrection_MolecularData(MET_Data_Normal,BatchData,MinPerBatch)
+        #MET_Data_Normal=TCGA_BatchCorrection_MolecularData(MET_Data_Normal,BatchData,MinPerBatch)
     } else {
         MET_Data_Normal=c()
     }
@@ -536,39 +625,20 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, METdirectory, Missi
 #' 
 #' Internal. Pre-processes DNA methylation data from TCGA from Illymina 450k arrays.
 #' @param CancerSite character of length 1 with TCGA cancer code.
-#' @param METdirectory character with directory where a folder for downloaded files will be created. Can be the object returned by the Download_DNAmethylation function.
+#' @param MAEO_450k matrix of methylation data extracted from the main MultiAssayExperiment object
 #' @param MissingValueThreshold threshold for removing samples or genes with missing values.
 #' @return List with pre processed methylation data for cancer and normal samples.
 #' @keywords internal
 #'
-Preprocess_CancerSite_Methylation450k <- function(CancerSite, METdirectory, MissingValueThreshold = 0.2) {
+Preprocess_CancerSite_Methylation450k <- function(CancerSite, MAEO_450k, MissingValueThreshold = 0.2) {
     
+    ##### MAE additions -Lucas #####
+    #at this point, MAEO_27k should mirror the eventual MET_Data; skipping below
+    MET_Data <- MAEO_450k
+    ################################
+
     get("BatchData")
     MinPerBatch=5
-    
-    if (grepl("Windows", Sys.info()['sysname'])) {
-        # If Windows I'll create a virtual drive to handle the long file names issue
-        # Create a virtual drive to overcome long names issue in Windows
-        virtualDir <- METdirectory
-        virtualDir <- gsub("\\\\", "/", virtualDir)
-        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
-        system(paste("subst x:", virtualDir))
-        
-        # Load data
-        METfiles <- dir("x:")
-        MatchedFilePosition <- grep('methylation__humanmethylation450', METfiles)             
-        Filename <- paste0("x://", METfiles[MatchedFilePosition])          
-        MET_Data <- TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
-        
-        system("subst x: /D") #stop virtual drive
-    } else {
-        # Not windows
-        # Load data
-        METfiles=dir(METdirectory)
-        MatchedFilePosition=grep('methylation__humanmethylation450',METfiles)             
-        Filename=paste0(METdirectory,METfiles[MatchedFilePosition])          
-        MET_Data=TCGA_GENERIC_LoadIlluminaMethylationData(Filename)
-    }
     
     # Split up normal and cancer data
     Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MET_Data))
@@ -581,9 +651,10 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, METdirectory, Miss
     if (CancerSite=='LAML') {
         MET_Data_Normal=MET_Data[,Samplegroups$BloodNormal]
     } else {
-        MET_Data_Normal=MET_Data[,Samplegroups$SolidNormal]
+        MET_Data_Normal=MET_Data[,Samplegroups$SolidNormal, drop=FALSE]
     }     
     if (length(MET_Data_Normal)>0) {
+        
         MET_Data_Normal=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Normal,15)
     }
     cat("There are",length(colnames(MET_Data_Cancer)),"cancer samples and",length(colnames(MET_Data_Normal)),"normal samples in",CancerSite,"\n")
@@ -625,21 +696,21 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, METdirectory, Miss
     }
     
     cat("\tBatch correction for the cancer samples.\n")
-    MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
-    MET_Data_Cancer2=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer2,BatchData,MinPerBatch)
-    MET_Data_Cancer3=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer3,BatchData,MinPerBatch)
-    MET_Data_Cancer4=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer4,BatchData,MinPerBatch)
-    MET_Data_Cancer5=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer5,BatchData,MinPerBatch)
-    MET_Data_Cancer6=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer6,BatchData,MinPerBatch)
-    MET_Data_Cancer7=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer7,BatchData,MinPerBatch)
-    MET_Data_Cancer8=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer8,BatchData,MinPerBatch)
+    #MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
+    #MET_Data_Cancer2=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer2,BatchData,MinPerBatch)
+    #MET_Data_Cancer3=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer3,BatchData,MinPerBatch)
+    #MET_Data_Cancer4=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer4,BatchData,MinPerBatch)
+    #MET_Data_Cancer5=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer5,BatchData,MinPerBatch)
+    #MET_Data_Cancer6=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer6,BatchData,MinPerBatch)
+    #MET_Data_Cancer7=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer7,BatchData,MinPerBatch)
+    #MET_Data_Cancer8=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer8,BatchData,MinPerBatch)
     
     if (length(MET_Data_Normal1)>0) {
         cat("\tBatch correction for the normal samples.\n")
-        MET_Data_Normal1=TCGA_BatchCorrection_MolecularData(MET_Data_Normal1,BatchData,2)
-        MET_Data_Normal2=TCGA_BatchCorrection_MolecularData(MET_Data_Normal2,BatchData,2)
-        MET_Data_Normal3=TCGA_BatchCorrection_MolecularData(MET_Data_Normal3,BatchData,2)
-        MET_Data_Normal4=TCGA_BatchCorrection_MolecularData(MET_Data_Normal4,BatchData,2)
+        #MET_Data_Normal1=TCGA_BatchCorrection_MolecularData(MET_Data_Normal1,BatchData,2)
+        #MET_Data_Normal2=TCGA_BatchCorrection_MolecularData(MET_Data_Normal2,BatchData,2)
+        #MET_Data_Normal3=TCGA_BatchCorrection_MolecularData(MET_Data_Normal3,BatchData,2)
+        #MET_Data_Normal4=TCGA_BatchCorrection_MolecularData(MET_Data_Normal4,BatchData,2)
     }
     
     # Combine batch corrected data
@@ -660,8 +731,6 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, METdirectory, Miss
     } else {
         MET_Data_Normal=c()
     }
-    
-    
     
     # Set values <0 to 0 and >1 to 1, because of batch correction
     MET_Data_Cancer[MET_Data_Cancer<0]=0
@@ -752,9 +821,10 @@ TCGA_GENERIC_GetSampleGroups <-function(SampleNames) {
 #' @return data matrix with cleaned sample names.
 #' @keywords internal
 #'
-TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 12) {     
+TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 12) {
     SampleNames=colnames(GEN_Data)
     SampleNamesShort=as.character(apply(as.matrix(SampleNames),2,substr,1,IDlength))
+    
     if (length(SampleNamesShort)!=length(unique(SampleNamesShort))) {
         # remove the doubles           
         Counts=table(SampleNamesShort)
@@ -766,9 +836,10 @@ TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 12) {
             pos=grep(CurrentDouble,SampleNames)
             #GEN_Data[1:10,pos]
             #cor(GEN_Data[,pos])
-            GEN_Data=GEN_Data[,-pos[2:length(pos)]]     
+            GEN_Data=GEN_Data[,-pos[2:length(pos)]]
             SampleNames=colnames(GEN_Data) # need to update samplenames because pos is relative to this
         }
+        
         SampleNames=colnames(GEN_Data)
         SampleNamesShort=as.character(apply(as.matrix(SampleNames),2,substr,1,IDlength))
         
@@ -776,7 +847,8 @@ TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 12) {
         colnames(GEN_Data)=SampleNamesShort
     } else {
         colnames(GEN_Data)=SampleNamesShort     
-    }     
+    }  
+    
     return(GEN_Data)
 }
 
@@ -799,7 +871,7 @@ TCGA_Process_EstimateMissingValues <- function(MET_Data, MissingValueThreshold =
     # removing clones with too many missing values
     NrMissingsPerGene=apply(MET_Data,1,function(x) sum(is.na(x)))/ncol(MET_Data)
     cat("Removing",sum(NrMissingsPerGene>MissingValueThreshold),"genes with more than",MissingValueThreshold*100,"% missing values.\n")
-    if (sum(NrMissingsPerGene>MissingValueThreshold)>0) MET_Data=MET_Data[NrMissingsPerGene<MissingValueThreshold,,drop=FALSE]
+    if (is.na(sum(NrMissingsPerGene)) || sum(NrMissingsPerGene>MissingValueThreshold)>0) MET_Data=MET_Data[NrMissingsPerGene<MissingValueThreshold,,drop=FALSE]
     
     # knn impute using Tibshirani's method
     if (length(colnames(MET_Data))>1) {
@@ -935,7 +1007,8 @@ TCGA_GENERIC_BatchCorrection <-function(GEN_Data,BatchData) {
 
 #' The Download_GeneExpression function
 #' 
-#' Downloads gene expression data from TCGA.
+#' Downloads gene expression data from TCGA. Note this is a legacy function as of version 2.12.0.
+#' Downloading is mediated by the curatedTCGAData package within the GetData() function.
 #' @param CancerSite character of length 1 with TCGA cancer code.
 #' @param TargetDirectory character with directory where a folder for downloaded files will be created.
 #' @param downloadData logical indicating if data should be downloaded (default: TRUE). If false, the url of the desired data is returned.
@@ -954,13 +1027,12 @@ TCGA_GENERIC_BatchCorrection <-function(GEN_Data,BatchData) {
 #' 
 #' # Gene expression data for ovarian cancer
 #' cancerSite <- "OV"
-#' targetDirectory <- paste0(getwd(), "/")
 #' 
 #' # Downloading gene expression data
-#' GEdirectories <- Download_GeneExpression(cancerSite, targetDirectory, TRUE)
+#' MAEO <- Download_Data(cancerSite)
 #' 
 #' # Processing gene expression data
-#' GEProcessedData <- Preprocess_GeneExpression(cancerSite, GEdirectories)
+#' GEProcessedData <- Preprocess_GeneExpression(cancerSite, MAEO)
 #' 
 #' # Saving gene expression processed data
 #' saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", cancerSite, "_Processed.rds"))
@@ -969,10 +1041,14 @@ TCGA_GENERIC_BatchCorrection <-function(GEN_Data,BatchData) {
 #' }
 #' 
 Download_GeneExpression <- function(CancerSite,TargetDirectory,downloadData=TRUE) {    
+
+    .Deprecated("Download_Data")
+    ## use Download_Data() in order to download assays as of 2.12.0
     
     dir.create(TargetDirectory,showWarnings=FALSE)
     
     # Settings
+    
     TCGA_acronym_uppercase=toupper(CancerSite)
     
     # get RNA seq data (GBM does not have much RNAseq data.)
@@ -1002,7 +1078,7 @@ Download_GeneExpression <- function(CancerSite,TargetDirectory,downloadData=TRUE
 #' 
 #' Pre-processes gene expression data from TCGA.
 #' @param CancerSite character of length 1 with TCGA cancer code.
-#' @param MAdirectories character vector with directories with the downloaded data. It can be the object returned by the Download_DNAmethylation function.
+#' @param MAEO MultiAssayExperiment object containing all the relevant experiments; methylation data is extracted out
 #' @param MissingValueThresholdGene threshold for missing values per gene. Genes with a percentage of NAs greater than this threshold are removed. Default is 0.3.
 #' @param MissingValueThresholdSample threshold for missing values per sample. Samples with a percentage of NAs greater than this threshold are removed. Default is 0.1.
 #' @details 
@@ -1020,21 +1096,30 @@ Download_GeneExpression <- function(CancerSite,TargetDirectory,downloadData=TRUE
 #' 
 #' # Gene expression data for ovarian cancer
 #' cancerSite <- "OV"
-#' targetDirectory <- paste0(getwd(), "/")
 #' 
 #' # Downloading gene expression data
-#' GEdirectories <- Download_GeneExpression(cancerSite, targetDirectory, TRUE)
+#' MAEO <- Download_Data(cancerSite)
 #' 
 #' # Processing gene expression data
-#' GEProcessedData <- Preprocess_GeneExpression(cancerSite, GEdirectories)
+#' GEProcessedData <- Preprocess_GeneExpression(cancerSite, MAEO)
 #' 
 #' # Saving gene expression processed data
 #' saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", cancerSite, "_Processed.rds"))
 #' 
 #' stopCluster(cl)
 #' }
-#'
-Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
+#' 
+Preprocess_GeneExpression <- function(CancerSite,MAEO,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) { 
+
+    ##### MAE additions -Lucas #####
+    #extract ge
+    #there are more edge cases
+    if (CancerSite == "OV") {
+        MAEO_ge <- as.matrix(assay(MAEO[[paste(CancerSite,"_mRNAArray_TX_g4502a-20160128",sep='')]]))
+    } else {
+        cat("Fill mRNAseq extraction here")
+    }
+    ################################
     
     get("BatchData")
     MinPerBatchCancer=5    
@@ -1043,102 +1128,20 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
     # Processing MA data, special case for OV and GBM where no RNA seq data is available
     if (CancerSite=="OV" || CancerSite=="GBM") { 
         MAstring='transcriptome__agilent'
-    } else if (CancerSite=="STAD" || CancerSite=="ESCA") { # for these cancers RSEM data does not exist. 
-        MAstring='mRNAseq_RPKM_log2.txt'
+    # disabling this, clearly RSEM data is now avaliable
+    #} else if (CancerSite=="STAD" || CancerSite=="ESCA") { # for these cancers RSEM data does not exist. 
+    #    MAstring='mRNAseq_RPKM_log2.txt'
     } else {
         MAstring='mRNAseq_RSEM_normalized_log2.txt'
     }
-    
-    if (grepl("Windows", Sys.info()['sysname'])) {
-        # If Windows I'll create a virtual drive to handle the long file names issue
-        # Create a virtual drive to overcome long names issue in Windows
-        MAdirectoriesOrig <- MAdirectories
-        virtualDir <- MAdirectories
-        virtualDir <- gsub("\\\\", "/", virtualDir)
-        virtualDir <- substr(virtualDir, 1, nchar(virtualDir) - 1)
-        system(paste("subst x:", virtualDir))
-        MAdirectories <- "x://"
-    }
-    
+
+
     #cat("Loading mRNA data.\n")
-    if (length(MAdirectories)>1) {              
-        cat("\tFound multiple MA data sets.\n")
-        DataSetsCancer=list()
-        GeneListsCancer=list()
-        SampleListsCancer=list()                
-        MetaBatchDataCancer=data.frame()
-        
-        DataSetsNormal=list()
-        GeneListsNormal=list()
-        SampleListsNormal=list()                
-        MetaBatchDataNormal=data.frame()
-        for (i in 1:length(MAdirectories)) {        
-            cat("\tProcessing data set",i,"\n")
-            MAfiles=dir(MAdirectories[i])
-            MatchedFile=grep(MAstring,MAfiles)        
-            if (length(MatchedFile)>0) {        
-                # Getting the cancer data first
-                DataSetsCancer[[i]]=Preprocess_MAdata_Cancer(CancerSite,MAdirectories[i],MAfiles[MatchedFile],MissingValueThresholdGene,MissingValueThresholdSample)
-                GeneListsCancer[[i]]=rownames(DataSetsCancer[[i]])
-                SampleListsCancer[[i]]=colnames(DataSetsCancer[[i]])                    
-                currentBatchCancer=matrix(i,length(colnames(DataSetsCancer[[i]])),1) # growing a batch data object
-                currentBatchDataCancer=data.frame(ArrayName=colnames(DataSetsCancer[[i]]),SampleName=colnames(DataSetsCancer[[i]]),Batch=currentBatchCancer)
-                MetaBatchDataCancer=rbind(MetaBatchDataCancer,currentBatchDataCancer)
-                
-                # Getting the normal data as well.
-                DataSetsNormal[[i]]=Preprocess_MAdata_Normal(CancerSite,MAdirectories[i],MAfiles[MatchedFile],MissingValueThresholdGene,MissingValueThresholdSample)
-                GeneListsNormal[[i]]=rownames(DataSetsNormal[[i]])
-                SampleListsNormal[[i]]=colnames(DataSetsNormal[[i]])                    
-                currentBatchNormal=matrix(i,length(colnames(DataSetsNormal[[i]])),1) # growing a batch data object
-                currentBatchDataNormal=data.frame(ArrayName=colnames(DataSetsNormal[[i]]),SampleName=colnames(DataSetsNormal[[i]]),Batch=currentBatchNormal)
-                MetaBatchDataNormal=rbind(MetaBatchDataNormal,currentBatchDataNormal)
-                
-            } else {
-                cat("MA file not found for this cancer.\n")
-            }           
-        }
-        # combine data sets with Combat. 
-        cat("Combining data sets.\n")
-        OverlapProbesCancer=Reduce(intersect,GeneListsCancer)
-        OverlapProbesNormal=Reduce(intersect,GeneListsNormal)
-        OverlapSamplesCancer=Reduce(intersect,SampleListsCancer)    
-        OverlapSamplesNormal=Reduce(intersect,SampleListsNormal)    
-        if (length(OverlapSamplesCancer)>0 | length(OverlapSamplesNormal)>0) {
-            cat('This should not happen. There is overlap between cancer or normal samples. No solution yet.\n')           
-        }        
-        
-        for (i in 1:length(MAdirectories)) {
-            DataSetsCancer[[i]]=DataSetsCancer[[i]][OverlapProbesCancer,]
-            DataSetsNormal[[i]]=DataSetsNormal[[i]][OverlapProbesNormal,]
-        }
-        # combat on cancer data sets. 
-        MA_TCGA_Cancer=Reduce(cbind,DataSetsCancer)
-        MA_TCGA_Cancer=TCGA_BatchCorrection_MolecularData(MA_TCGA_Cancer,MetaBatchDataCancer,MinPerBatchCancer)    
-        
-        # combat on normal data sets. 
-        MA_TCGA_Normal=Reduce(cbind,DataSetsNormal)
-        MA_TCGA_Normal=TCGA_BatchCorrection_MolecularData(MA_TCGA_Normal,MetaBatchDataNormal,MinPerBatchNormal)    
-        
-    } else {
-        
-        MAfiles=dir(MAdirectories)
-        MatchedFile=grep(MAstring,MAfiles)        
-        if (length(MatchedFile)>0) {                  
-            MA_TCGA_Cancer=Preprocess_MAdata_Cancer(CancerSite,MAdirectories,MAfiles[MatchedFile],MissingValueThresholdGene,MissingValueThresholdSample)
-            MA_TCGA_Normal=Preprocess_MAdata_Normal(CancerSite,MAdirectories,MAfiles[MatchedFile],MissingValueThresholdGene,MissingValueThresholdSample)               
-            cat("There are",length(colnames(MA_TCGA_Cancer)),"cancer samples and",length(colnames(MA_TCGA_Normal)),"normal samples in",CancerSite,"\n")
-        } else {               
-            stop("MA file not found for this cancer.\n")
-        }           
-    }
-    MA_TCGA_Cancer = TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Cancer, 12)
-    if (ncol(MA_TCGA_Normal) == 0) {
-        MA_TCGA_Normal = NULL
-    } else {
-        MA_TCGA_Normal = TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Normal, 12)
-    }
-    
-    if (grepl("Windows", Sys.info()['sysname'])) system("subst x: /D") #stop virtual drive
+    #removed functionality to combine multiple microarray sets; OV data was not doing this, even though three microarray datasets existed,
+    #which cancer lines does this affect? could add back in, but will increase time intensity due to reduce/combat
+    MA_TCGA_Cancer=Preprocess_MAdata_Cancer(CancerSite,MAEO_ge,MissingValueThresholdGene,MissingValueThresholdSample)
+    MA_TCGA_Normal=Preprocess_MAdata_Normal(CancerSite,MAEO_ge,MissingValueThresholdGene,MissingValueThresholdSample)               
+    cat("There are",length(colnames(MA_TCGA_Cancer)),"cancer samples and",length(colnames(MA_TCGA_Normal)),"normal samples in",CancerSite,"\n")
     
     return(list(GEcancer = MA_TCGA_Cancer, GEnormal = MA_TCGA_Normal))
 }
@@ -1147,21 +1150,20 @@ Preprocess_GeneExpression <- function(CancerSite,MAdirectories,MissingValueThres
 #' 
 #' Internal. Pre-process gene expression data for cancer samples.
 #' @param CancerSite TCGA code for the cancer site.
-#' @param Directory Directory.
-#' @param File File.
+#' @param MAEO_ge matrix of gene expression data extracted from the main MultiAssayExperiment object
 #' @param MissingValueThresholdGene threshold for missing values per gene. Genes with a percentage of NAs greater than this threshold are removed. Default is 0.3.
 #' @param MissingValueThresholdSample threshold for missing values per sample. Samples with a percentage of NAs greater than this threshold are removed. Default is 0.1.
 #' @return The data matrix.
 #' @keywords internal
 #'
-Preprocess_MAdata_Cancer <- function(CancerSite,Directory,File,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
+Preprocess_MAdata_Cancer <- function(CancerSite,MAEO_ge,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
     
     get("BatchData")
     
     MinPerBatch=5   
     cat("Loading cancer mRNA data.\n")
     cat("\tMissing value estimation.\n")
-    MA_TCGA=TCGA_Load_MolecularData(paste(Directory,File,sep=''), MissingValueThresholdGene, MissingValueThresholdSample)        
+    MA_TCGA=TCGA_Load_MolecularData(MAEO_ge, MissingValueThresholdGene, MissingValueThresholdSample)        
     Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MA_TCGA))        
     if (CancerSite =='LAML') {
         MA_TCGA=MA_TCGA[,Samplegroups$PeripheralBloodCancer,drop=F]
@@ -1169,7 +1171,7 @@ Preprocess_MAdata_Cancer <- function(CancerSite,Directory,File,MissingValueThres
         MA_TCGA=MA_TCGA[,Samplegroups$Primary,drop=F]
     }          
     cat("\tBatch correction.\n")
-    MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
+    #MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
     
     cat("\tProcessing gene ids and merging.\n")
     Genes=rownames(MA_TCGA)
@@ -1185,14 +1187,13 @@ Preprocess_MAdata_Cancer <- function(CancerSite,Directory,File,MissingValueThres
 #' 
 #' Internal. Pre-process gene expression data for normal samples.
 #' @param CancerSite TCGA code for the cancer site.
-#' @param Directory Directory.
-#' @param File File.
+#' @param MAEO_ge matrix of gene expression data extracted from the main MultiAssayExperiment object
 #' @param MissingValueThresholdGene threshold for missing values per gene. Genes with a percentage of NAs greater than this threshold are removed. Default is 0.3.
 #' @param MissingValueThresholdSample threshold for missing values per sample. Samples with a percentage of NAs greater than this threshold are removed. Default is 0.1.
 #' @return The data matrix.
 #' @keywords internal
 #'
-Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
+Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGene=0.3,MissingValueThresholdSample=0.1) {    
     
     get("BatchData")
     
@@ -1200,8 +1201,9 @@ Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThres
     
     cat("Loading normal mRNA data.\n")
     cat("\tMissing value estimation.\n")
-    MA_TCGA=TCGA_Load_MolecularData(paste(Directory,File,sep=''), MissingValueThresholdGene, MissingValueThresholdSample)        
-    Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MA_TCGA))        
+    MA_TCGA=TCGA_Load_MolecularData(MAEO_ge, MissingValueThresholdGene, MissingValueThresholdSample)        
+    Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MA_TCGA))
+    cat("Broken")       
     if (CancerSite =='LAML') {
         MA_TCGA=MA_TCGA[,Samplegroups$BloodNormal,drop=F]
     } else {
@@ -1209,7 +1211,7 @@ Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThres
         MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal,drop=F]
     }          
     cat("\tBatch correction.\n")
-    MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
+    #MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
     
     cat("\tProcessing gene ids and merging.\n")
     Genes=rownames(MA_TCGA)
@@ -1222,37 +1224,22 @@ Preprocess_MAdata_Normal <- function(CancerSite,Directory,File,MissingValueThres
     return(MA_TCGA=MA_TCGA)
 }
 
-#' The TCGA_Load_MolecularData function
+#' The TCGA_Load_MolecularData function... maybe rename this
 #' 
-#' Internal. Reads in gene expressiondata. Deletes samples and genes with more NAs than the respective thresholds. Imputes other NAs values.
-#' @param Filename name of the file with the data.
+#' Internal. Reads in gene expression data. Deletes samples and genes with more NAs than the respective thresholds. Imputes other NAs values.
+#' @param MAEO_ge matrix of gene expression data extracted from the main MultiAssayExperiment object
 #' @param MissingValueThresholdGene threshold for missing values per gene. Genes with a percentage of NAs greater than this threshold are removed. Default is 0.3.
 #' @param MissingValueThresholdSample threshold for missing values per sample. Samples with a percentage of NAs greater than this threshold are removed. Default is 0.1.
 #' @return gene expression data.
 #' @keywords internal
 #'
-TCGA_Load_MolecularData <- function(Filename, MissingValueThresholdGene = 0.3, MissingValueThresholdSample = 0.1) {     
+TCGA_Load_MolecularData <- function(MAEO_ge, MissingValueThresholdGene = 0.3, MissingValueThresholdSample = 0.1) {     
     
-    # loading the data in R
-    Matching=regexpr('.mat$',Filename,perl=TRUE)
-    if (Matching[[1]]>0) {     
-        # MET_Data=TCGA_GENERIC_ReadDataMatrixMatFile(Filename)
-        DataList=R.matlab::readMat(Filename)
-        MATdata=as.matrix(DataList$RawData)
-        rownames(MATdata)=DataList[[2]]
-        colnames(MATdata)=DataList[[3]]
-        
-    } else {
-        MET_Data=read.csv(Filename,sep="\t",row.names=1,header=TRUE,na.strings=c("NA","null"))
-    }
-    if (rownames(MET_Data)[1]=='Composite Element REF') {
-        cat("Removing first row with text stuff.\n")
-        MET_Data=MET_Data[-1,]         
-        Genes=rownames(MET_Data)
-        MET_Data=apply(MET_Data,2,as.numeric)
-        rownames(MET_Data)=Genes
-    }
-    
+    ##### MAE additions -Lucas #####
+    #conforming
+    MET_Data <- MAEO_ge
+    ################################
+
     SampleNames=colnames(MET_Data)
     SampleNames=gsub('\\.','-',SampleNames)
     colnames(MET_Data)=SampleNames
@@ -1347,38 +1334,7 @@ TCGA_GENERIC_MergeData <-function(NewIDListUnique, DataMatrix) {
 #' @export
 #' @keywords cluter_probes
 #' @importFrom foreach %dopar%
-#' @examples 
-#' \dontrun{
-#' 
-#' # Optional register cluster to run in parallel
-#' library(doParallel)
-#' cl <- makeCluster(5)
-#' registerDoParallel(cl)
-#' 
-#' # Methylation data for ovarian cancer
-#' cancerSite <- "OV"
-#' targetDirectory <- paste0(getwd(), "/")
-#' 
-#' # Downloading methylation data
-#' METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
-#' 
-#' # Processing methylation data
-#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
-#' 
-#' # Saving methylation processed data
-#' saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
-#' 
-#' # Clustering methylation data
-#' res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
-#' 
-#' # Saving methylation clustered data
-#' toSave <- list(METcancer = res[[1]], METnormal = res[[2]], ProbeMapping = res$ProbeMapping)
-#' saveRDS(toSave, file = paste0(targetDirectory, "MET_", cancerSite, "_Clustered.rds"))
-#' 
-#' stopCluster(cl)
-#' }
-#'  
-ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
+ClusterProbes <- function(MET_Cancer, MET_Normal, MAEO_Probes=NULL, CorThreshold = 0.4) {
     
     # Top level function that implements an equivalent cluster algorithm but using hierarchical clustering with complete linkage. 
     
@@ -1390,8 +1346,13 @@ ClusterProbes <- function(MET_Cancer, MET_Normal, CorThreshold = 0.4) {
     }
     
     #Get probe information
-    get("ProbeAnnotation")
-    
+    if (is.null(MAEOProbes)) {
+        get("ProbeAnnotation")
+    } else {
+        ProbeAnnotation <- MAEO_Probes
+    }
+
+
     # remove probes with SNPs
     get("SNPprobes")
     
