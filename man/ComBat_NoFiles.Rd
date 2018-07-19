@@ -5,7 +5,7 @@
 \title{The ComBat_NoFiles function}
 \usage{
 ComBat_NoFiles(dat, saminfo, type = "txt", write = F, covariates = "all",
-  par.prior = T, filter = F, skip = 0, prior.plots = T)
+  par.prior = F, filter = F, skip = 0, prior.plots = T)
 }
 \arguments{
 \item{dat}{dat}
@@ -35,4 +35,3 @@ Results.
 Internal. Performs batch correction.
 }
 \keyword{internal}
-

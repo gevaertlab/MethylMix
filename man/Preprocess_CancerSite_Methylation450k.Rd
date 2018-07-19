@@ -21,4 +21,3 @@ List with pre processed methylation data for cancer and normal samples.
 Internal. Pre-processes DNA methylation data from TCGA from Illymina 450k arrays.
 }
 \keyword{internal}
-

@@ -18,4 +18,3 @@ data matrix.
 Internal.
 }
 \keyword{internal}
-

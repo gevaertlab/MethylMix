@@ -18,4 +18,3 @@ the data set with imputed values and possibly some genes or samples deleted.
 Internal. Removes patients and genes with more missing values than the MissingValueThreshold, and imputes remaining missing values using Tibshirani's KNN method.
 }
 \keyword{internal}
-

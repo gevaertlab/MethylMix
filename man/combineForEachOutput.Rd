@@ -18,4 +18,3 @@ List with the combined results.
 Internal. Function to combine results from the foreach loop.
 }
 \keyword{internal}
-

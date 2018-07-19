@@ -20,4 +20,3 @@ The corrected data matrix.
 Internal. Wrapper to perform batch correction.
 }
 \keyword{internal}
-

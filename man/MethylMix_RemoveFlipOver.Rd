@@ -31,4 +31,3 @@ Internal. The estimated densities for each beta component can overlap, generatin
 This function re classifies such samples.
 }
 \keyword{internal}
-

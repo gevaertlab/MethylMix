@@ -20,4 +20,3 @@ betaEst_2(Y, w, weights)
 Internal. Estimates a beta distribution via Maximum Likelihood. Adapted from RPMM package.
 }
 \keyword{internal}
-

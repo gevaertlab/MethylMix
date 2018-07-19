@@ -30,4 +30,3 @@ data(GEcancer)
 MethylMixResults <- MethylMix_ModelGeneExpression(METcancer, GEcancer)
 
 }
-

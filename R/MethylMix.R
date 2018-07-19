@@ -58,9 +58,9 @@ NULL
 #' for homogeneous subpopulations. In addition matched gene expression data (e.g. from microarray technology or RNA sequencing) 
 #' is used to identify functional DNA methylation events by requiring a negative correlation between methylation 
 #' and gene expression of a particular gene. See references below.
-#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns.
-#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
+#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
 #' @param listOfGenes Vector with genes names to be evaluated, names must coincide with the names of the rows of METcancer.
 #' @param filter Logical indicating if the linear regression to select genes with significative linear negative relation between methylation and gene expression should be performed (default: TRUE).
 #' @param NoNormalMode Logical indicating if the methylation states found in the cancer samples should be compared to the normal samples (default: FALSE).
@@ -80,6 +80,8 @@ NULL
 #' Gevaert 0. \href{https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv020}{MethylMix: an R package for identifying DNA methylation-driven genes}. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020.
 #' 
 #' Gevaert O, Tibshirani R, Plevritis SK. \href{http://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0579-8}{Pancancer analysis of DNA methylation-driven genes using MethylMix}. Genome Biology. 2015;16(1):17. doi:10.1186/s13059-014-0579-8.
+#'
+#' Pierre-Louis Cedoz, Marcos Prunello, Kevin Brennan, Olivier Gevaert; MethylMix 2.0: an R package for identifying DNA methylation genes. Bioinformatics. doi:10.1093/bioinformatics/bty156.
 #' @examples
 #' # load the three data sets needed for MethylMix
 #' data(METcancer)
@@ -657,11 +659,12 @@ betaEst_2 <-function (Y, w, weights) {
 #' Produces plots to represent MethylMix's output.
 #' @param GeneName Name of the gene for which to create a MethylMix plot.
 #' @param MixtureModelResults List returned by MethylMix function.
-#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns (optional).
-#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
+#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
 #' @return a list with MethylMix plots, a histogram of the methylation data (MixtureModelPlot) and a scatterplot between DNA methylation and gene expression
 #' (CorrelationPlot, is NULL if gene expression data is not provided). Both plots show the different mixture components identified.
+#' @import ggplot2
 #' @export
 #' @examples
 #' # Load the three data sets needed for MethylMix
@@ -728,7 +731,7 @@ MethylMix_PlotModel <- function(GeneName, MixtureModelResults, METcancer, GEcanc
         # Histogram
         g2 <- 
             ggplot2::ggplot(data, ggplot2::aes(x = met)) + 
-            ggplot2::geom_histogram(ggplot2::aes(y = ..density..), breaks = seq(0, 1, by = .02), col = "black", fill = "lightgrey") + 
+            ggplot2::geom_histogram(ggplot2::aes(y = stat(density)), breaks = seq(0, 1, by = .02), col = "black", fill = "lightgrey") + 
             ggplot2::scale_y_continuous(name = "Density") +
             ggplot2::scale_x_continuous(name = "DNA Methylation", limits = 0:1) +
             ggplot2::geom_line(data = betaDensity, ggplot2::aes(x = x, y = dens, colour = factor(comp)), size = 1.5) +
@@ -744,7 +747,7 @@ MethylMix_PlotModel <- function(GeneName, MixtureModelResults, METcancer, GEcanc
         if (!is.null(METnormal)) {
             g2build <- ggplot2::ggplot_build(g2)
             # maxY <- max(max(g2build$data[[1]]$y), max(betaDensity$dens)) 
-            yheight <- g2build$layout$panel_ranges[[1]]$y.range[2] * 0.95
+            yheight <- g2build$layout$panel_params[[1]]$y.range[2] * 0.95
             metnormal <- METnormal[GeneName, , drop=FALSE]
             if (length(metnormal) > 1) {
                 tmpTtest1 <- t.test(metnormal)

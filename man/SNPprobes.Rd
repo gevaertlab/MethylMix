@@ -8,4 +8,3 @@
 Vector with probes with SNPs.
 }
 \keyword{datasets}
-

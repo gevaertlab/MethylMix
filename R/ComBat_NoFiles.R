@@ -143,6 +143,7 @@ ComBat_NoFiles <- function(dat, saminfo, type='txt', write=F, covariates='all', 
      if(par.prior){
           cat("Finding parametric adjustments\n")
           for (i in 1:n.batch){
+               cat(paste0("Starting batch ", i, " of ", n.batch))
                temp <- it.sol(s.data[,batches[[i]]],gamma.hat[i,],delta.hat[i,],gamma.bar[i],t2[i],a.prior[i],b.prior[i])
                gamma.star <- rbind(gamma.star,temp[1,])
                delta.star <- rbind(delta.star,temp[2,])
@@ -150,6 +151,7 @@ ComBat_NoFiles <- function(dat, saminfo, type='txt', write=F, covariates='all', 
      }else{
           cat("Finding nonparametric adjustments\n")
           for (i in 1:n.batch){
+               cat(paste0("Starting batch ", i, " of ", n.batch))
                temp <- int.eprior(as.matrix(s.data[,batches[[i]]]),gamma.hat[i,],delta.hat[i,])
                gamma.star <- rbind(gamma.star,temp[1,])
                delta.star <- rbind(delta.star,temp[2,])

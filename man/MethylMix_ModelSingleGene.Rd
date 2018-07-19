@@ -46,4 +46,3 @@ maxComp, PvalueThreshold, METDiffThreshold, minSamplesPerGroup are arguments for
 because they are not available in the main MethylMix function, to keep it simple. It would be easy to make them available to the user if we want to.
 }
 \keyword{internal}
-

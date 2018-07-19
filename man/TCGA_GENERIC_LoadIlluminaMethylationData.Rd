@@ -18,4 +18,3 @@ Internal. Read in an illumina methylation file with the following format: header
 The first column has the probe names.
 }
 \keyword{internal}
-

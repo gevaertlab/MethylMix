@@ -24,5 +24,36 @@ Probes with SNPs are removed.
 This function is prepared to run in parallel if the user registers a parallel structure, otherwise it runs sequentially.
 This function also cleans up the sample names, converting them to the 12 digit format.
 }
-\keyword{cluter_probes}
+\examples{
+\dontrun{
 
+# Optional register cluster to run in parallel
+library(doParallel)
+cl <- makeCluster(5)
+registerDoParallel(cl)
+
+# Methylation data for ovarian cancer
+cancerSite <- "OV"
+targetDirectory <- paste0(getwd(), "/")
+
+# Downloading methylation data
+METdirectories <- Download_DNAmethylation(cancerSite, targetDirectory, TRUE)
+
+# Processing methylation data
+METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
+
+# Saving methylation processed data
+saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
+
+# Clustering methylation data
+res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+
+# Saving methylation clustered data
+toSave <- list(METcancer = res[[1]], METnormal = res[[2]], ProbeMapping = res$ProbeMapping)
+saveRDS(toSave, file = paste0(targetDirectory, "MET_", cancerSite, "_Clustered.rds"))
+
+stopCluster(cl)
+}
+ 
+}
+\keyword{cluter_probes}
