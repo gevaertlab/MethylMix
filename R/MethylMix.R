@@ -58,9 +58,9 @@ NULL
 #' for homogeneous subpopulations. In addition matched gene expression data (e.g. from microarray technology or RNA sequencing) 
 #' is used to identify functional DNA methylation events by requiring a negative correlation between methylation 
 #' and gene expression of a particular gene. See references below.
-#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns.
-#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
+#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer. Again genes in rows and samples in columns. The samples do not have to match with the cancer data. If this argument is NULL, MethylMix will run without comparing to normal samples.
 #' @param listOfGenes Vector with genes names to be evaluated, names must coincide with the names of the rows of METcancer.
 #' @param filter Logical indicating if the linear regression to select genes with significative linear negative relation between methylation and gene expression should be performed (default: TRUE).
 #' @param NoNormalMode Logical indicating if the methylation states found in the cancer samples should be compared to the normal samples (default: FALSE).
@@ -666,9 +666,9 @@ betaEst_2 <-function (Y, w, weights) {
 #' Produces plots to represent MethylMix's output.
 #' @param GeneName Name of the gene for which to create a MethylMix plot.
 #' @param MixtureModelResults List returned by MethylMix function.
-#' @param METcancer	Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
+#' @param METcancer Matrix with the methylation data of cancer tissue with genes in rows and samples in columns.
 #' @param GEcancer Gene expression data for cancer tissue with genes in rows and samples in columns (optional).
-#' @param METnormal	Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
+#' @param METnormal Matrix with the normal methylation data of the same genes as in METcancer (optional). Again genes in rows and samples in columns.
 #' @return a list with MethylMix plots, a histogram of the methylation data (MixtureModelPlot) and a scatterplot between DNA methylation and gene expression
 #' (CorrelationPlot, is NULL if gene expression data is not provided). Both plots show the different mixture components identified.
 #' @export
