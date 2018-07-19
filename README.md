@@ -7,7 +7,7 @@
 [![Build Status](https://www.bioconductor.org/shields/build/release/bioc/MethylMix.svg)](http://bioconductor.org/checkResults/release/bioc-LATEST/MethylMix/)
 [![Downloads](http://bioconductor.org/shields/downloads/MethylMix.svg)](http://bioconductor.org/packages/stats/bioc/MethylMix/)
 [![License](https://img.shields.io/badge/license-GPL-yellow.svg)](https://opensource.org/licenses/GPL-2.0)
-[![Version](https://img.shields.io/badge/version-2.10.0-lightgrey.svg)](https://www.bioconductor.org/packages/release/bioc/html/MethylMix.html)
+[![Version](https://img.shields.io/badge/version-2.10.1-lightgrey.svg)](https://www.bioconductor.org/packages/release/bioc/html/MethylMix.html)
 
 An R package for identifying DNA methylation driven genes.
 
