@@ -77,7 +77,7 @@ NULL
 #' \item{Models}{Beta mixture model parameters for each driver gene.}
 #' @export
 #' @references 
-#' Gevaert 0. \href{https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv020}{MethylMix: an R package for identifying DNA methylation-driven genes}. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020.
+#' Gevaert O. \href{https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv020}{MethylMix: an R package for identifying DNA methylation-driven genes}. Bioinformatics (Oxford, England). 2015;31(11):1839-41. doi:10.1093/bioinformatics/btv020.
 #' 
 #' Gevaert O, Tibshirani R, Plevritis SK. \href{http://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0579-8}{Pancancer analysis of DNA methylation-driven genes using MethylMix}. Genome Biology. 2015;16(1):17. doi:10.1186/s13059-014-0579-8.
 #'
