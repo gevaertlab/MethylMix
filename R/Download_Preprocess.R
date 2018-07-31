@@ -72,9 +72,10 @@ GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
     
     # Clustering probes to genes
     cat("Clustering methylation data for:", cancerSite, "\n")
-    MAEO_Probes <- Pull_Probe_Annotation(MAEO)
-    res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]],
-                         MAEO_Probes=MAEO_Probes)
+    #MAEO_Probes <- Pull_Probe_Annotation(MAEO)
+    #res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]],
+    #                     MAEO_Probes=MAEO_Probes)
+    res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
     
     # Putting everything together
     cat("Saving data\n")
@@ -107,19 +108,6 @@ GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
 #' 
 #' # Downloading data
 #' MAEO <- Download_Data(cancerSite)
-#' 
-#' # Processing methylation data
-#' METProcessedData <- Preprocess_DNAmethylation(cancerSite, METdirectories)
-#' 
-#' # Saving methylation processed data
-#' saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", cancerSite, "_Processed.rds"))
-#' 
-#' # Clustering methylation data
-#' res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
-#' 
-#' # Saving methylation clustered data
-#' toSave <- list(METcancer = res[[1]], METnormal = res[[2]], ProbeMapping = res$ProbeMapping)
-#' saveRDS(toSave, file = paste0(targetDirectory, "MET_", cancerSite, "_Clustered.rds"))
 #' 
 #' stopCluster(cl)
 #' }
@@ -165,6 +153,7 @@ Pull_Probe_Annotation <- function(MAEO) {
     probes_all <- data.frame(rbind(probes,probes2), stringsAsFactors=FALSE)
 
     colnames(probes_all) <- c("ILMNID", "GENESYMBOL")
+    probes_all <- na.omit(probes_all)
 
     return(data.frame(probes_all))
 }
@@ -504,6 +493,7 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
       Mode='450kon27k'               
       cat("\tCombining 450k and 27k by mapping 450k probes to 27k array.\n")
       # Check if there are duplicate samples, remove the 27k ones. 
+      # print size and type of each here
       OverlapSamplesCancer=intersect(colnames(ProcessedData27k$MET_Data_Cancer),colnames(ProcessedData450k$MET_Data_Cancer))
       if (length(OverlapSamplesCancer)>0) {
         cat("\tCancer sample overlap is not empty: ",length(OverlapSamplesCancer))
@@ -567,7 +557,26 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
       ProcessedData=ProcessedData450k          
   }     
 
-    return(ProcessedData=ProcessedData)
+  if (FALSE) {
+    #Good spot to run FASTEWASHER thing
+    # build matrix of both cancer and normal
+    excludedRows1 <- setdiff(rownames(METProcessedData$MET_Data_Cancer), rownames(METProcessedData$MET_Data_Normal))
+    excludedRows2 <- setdiff(rownames(METProcessedData$MET_Data_Normal), rownames(METProcessedData$MET_Data_Cancer))
+    excludedRows <- c(excludedRows1, excludedRows2)
+    indexes1 <- !row.names(METProcessedData$MET_Data_Cancer) %in% excludedRows
+    indexes2 <- !row.names(METProcessedData$MET_Data_Normal) %in% excludedRows
+
+    ewasherData <- cbind(METProcessedData$MET_Data_Cancer[indexes1,],METProcessedData$MET_Data_Normal[indexes2,])
+    # build value table of cancer and normal sample name and val
+    ewasherPheno <- colnames(ewasherData)
+    # write both to temp files
+
+    # run ewasher
+
+    # delete temp files
+  }
+
+  return(ProcessedData=ProcessedData)
 }
 
 #' The Preprocess_CancerSite_Methylation27k function
