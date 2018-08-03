@@ -1,3 +1,23 @@
+MethylMix v2.11-0 (Release date: 2018-10-?)
+==============
+
+Changes:
+
+* Implemented new data download and preprocessing functions
+* MethylMix now queries data from the 'curatedTCGAData' package
+* MethylMix now wraps matrices in 'MultiAssayExperiment' objects whenever possible, this allows association of various multiomics data with patient information
+* MethylMix now saves patient data as one of its outputs
+* RSEM data is now used for all cancer samples, when queried by the new 'curatedTCGAData' functions
+
+* More informative debug messages
+* Code organization
+* Several bug fixes and reimplementations
+
+MethylMix v2.10-0 (Release date: 2018-07-16)
+==============
+
+* Bug fixes for ggplot2
+
 MethylMix v2.8-0 (Release date: 2017-11-05)
 ==============
 

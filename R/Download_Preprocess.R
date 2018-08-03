@@ -72,6 +72,7 @@ GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
     
     # Clustering probes to genes
     cat("Clustering methylation data for:", cancerSite, "\n")
+    # Below is a method to update probe annotations through the MAEO object, but is not functional
     #MAEO_Probes <- Pull_Probe_Annotation(MAEO)
     #res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]],
     #                     MAEO_Probes=MAEO_Probes)
@@ -497,12 +498,12 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
       OverlapSamplesCancer=intersect(colnames(ProcessedData27k$MET_Data_Cancer),colnames(ProcessedData450k$MET_Data_Cancer))
       if (length(OverlapSamplesCancer)>0) {
         cat("\tCancer sample overlap is not empty: ",length(OverlapSamplesCancer))
-        ProcessedData27k$MET_Data_Cancer=ProcessedData27k$MET_Data_Cancer[,-OverlapSamplesCancer,drop=FALSE]
+        ProcessedData27k$MET_Data_Cancer=ProcessedData27k$MET_Data_Cancer[,!colnames(ProcessedData27k$MET_Data_Cancer) %in% OverlapSamplesCancer,drop=FALSE]
       }
       OverlapSamplesNormal=intersect(colnames(ProcessedData27k$MET_Data_Normal),colnames(ProcessedData450k$MET_Data_Normal))
       if (length(OverlapSamplesNormal)>0) {
         cat("\tNormal sample overlap is not empty: ",length(OverlapSamplesNormal))
-        ProcessedData27k$MET_Data_Normal=ProcessedData27k$MET_Data_Normal[,-OverlapSamplesNormal,drop=FALSE]
+        ProcessedData27k$MET_Data_Normal=ProcessedData27k$MET_Data_Normal[,!colnames(ProcessedData450k$MET_Data_Normal) %in% OverlapSamplesNormal,drop=FALSE]
       }
           
       # Overlap the probes
@@ -522,14 +523,14 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
           Batch=matrix(1,length(colnames(ProcessedData$MET_Data_Cancer)),1)
           Batch[1:length(colnames(ProcessedData27k$MET_Data_Cancer)),1]=2
           BatchData=data.frame(ArrayName=colnames(ProcessedData$MET_Data_Cancer),SampleName=colnames(ProcessedData$MET_Data_Cancer),Batch=Batch)
-          #ProcessedData$MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Cancer,BatchData,0)
+          ProcessedData$MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Cancer,BatchData,0)
           
           if (length(colnames(ProcessedData$MET_Data_Normal))>0) {
               # Batch correction on combined Normal data.
               Batch=matrix(1,length(colnames(ProcessedData$MET_Data_Normal)),1)
               Batch[1:length(colnames(ProcessedData27k$MET_Data_Normal)),1]=2
               BatchData=data.frame(ArrayName=colnames(ProcessedData$MET_Data_Normal),SampleName=colnames(ProcessedData$MET_Data_Normal),Batch=Batch)
-              #ProcessedData$MET_Data_Normal=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Normal,BatchData,5)
+              ProcessedData$MET_Data_Normal=TCGA_BatchCorrection_MolecularData(ProcessedData$MET_Data_Normal,BatchData,5)
           }               
           
       } else if (ncol(ProcessedData27k$MET_Data_Cancer)>ncol(ProcessedData450k$MET_Data_Cancer)) { 
@@ -569,8 +570,11 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
     ewasherData <- cbind(METProcessedData$MET_Data_Cancer[indexes1,],METProcessedData$MET_Data_Normal[indexes2,])
     # build value table of cancer and normal sample name and val
     ewasherPheno <- colnames(ewasherData)
+    phenoVals <- c(rep(0,length(colnames(METProcessedData$MET_Data_Cancer[indexes1,]))),rep(1,length(colnames(METProcessedData$MET_Data_Normal[indexes2,]))))
+    ewasherPheno <- cbind(ewasherPheno, phenoVals)
     # write both to temp files
-
+    write.table(ewasherData, file="ewasherData.tsv", sep='\t', quote=FALSE, col.names=NA, row.names=TRUE)
+    write.table(ewasherPheno, file="ewasherPheno.tsv", sep='\t', quote=FALSE, col.names=FALSE, row.names=FALSE)
     # run ewasher
 
     # delete temp files
@@ -606,14 +610,14 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, MAEO_27k, MissingVa
   } else {
     MET_Data_Cancer=MET_Data[,Samplegroups$Primary,drop=FALSE]
   }
-  MET_Data_Cancer=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Cancer,15)
+  MET_Data_Cancer=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Cancer,12)
   if (CancerSite=='LAML') {
     MET_Data_Normal=MET_Data[,Samplegroups$BloodNormal,drop=FALSE]
   } else {
     MET_Data_Normal=MET_Data[,Samplegroups$SolidNormal,drop=FALSE]
   }
   if (length(MET_Data_Normal)>0) {
-    MET_Data_Normal=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Normal,15)
+    MET_Data_Normal=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Normal,12)
   }
   cat("There are",length(colnames(MET_Data_Cancer)),"cancer samples and",length(colnames(MET_Data_Normal)),"normal samples in",CancerSite,"\n")
   
@@ -628,12 +632,12 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, MAEO_27k, MissingVa
   # Batch correction for cancer and normal. 
   cat("\tBatch correction for the cancer samples.\n")
   BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Cancer,BatchData)
-  #MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
+  MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
   
   if (length(MET_Data_Normal)>0) {
     cat("\tBatch correction for the normal samples.\n")
     BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Normal,BatchData)
-    #MET_Data_Normal=TCGA_BatchCorrection_MolecularData(MET_Data_Normal,BatchData,MinPerBatch)
+    MET_Data_Normal=TCGA_BatchCorrection_MolecularData(MET_Data_Normal,BatchData,MinPerBatch)
   } else {
     MET_Data_Normal=c()
   }
@@ -678,14 +682,14 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, MAEO_450k, Missing
   } else {
     MET_Data_Cancer=MET_Data[,Samplegroups$Primary]
   }
-  MET_Data_Cancer=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Cancer,15)
+  MET_Data_Cancer=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Cancer,12)
   if (CancerSite=='LAML') {
     MET_Data_Normal=MET_Data[,Samplegroups$BloodNormal]
   } else {
     MET_Data_Normal=MET_Data[,Samplegroups$SolidNormal, drop=FALSE]
   }     
   if (length(MET_Data_Normal)>0) {      
-    MET_Data_Normal=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Normal,15)
+    MET_Data_Normal=TCGA_GENERIC_CleanUpSampleNames(MET_Data_Normal,12)
   }
   cat("There are",length(colnames(MET_Data_Cancer)),"cancer samples and",length(colnames(MET_Data_Normal)),"normal samples in",CancerSite,"\n")
   
@@ -726,21 +730,21 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, MAEO_450k, Missing
   }
   
   cat("\tBatch correction for the cancer samples.\n")
-  #MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
-  #MET_Data_Cancer2=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer2,BatchData,MinPerBatch)
-  #MET_Data_Cancer3=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer3,BatchData,MinPerBatch)
-  #MET_Data_Cancer4=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer4,BatchData,MinPerBatch)
-  #MET_Data_Cancer5=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer5,BatchData,MinPerBatch)
-  #MET_Data_Cancer6=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer6,BatchData,MinPerBatch)
-  #MET_Data_Cancer7=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer7,BatchData,MinPerBatch)
-  #MET_Data_Cancer8=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer8,BatchData,MinPerBatch)
+  MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
+  MET_Data_Cancer2=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer2,BatchData,MinPerBatch)
+  MET_Data_Cancer3=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer3,BatchData,MinPerBatch)
+  MET_Data_Cancer4=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer4,BatchData,MinPerBatch)
+  MET_Data_Cancer5=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer5,BatchData,MinPerBatch)
+  MET_Data_Cancer6=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer6,BatchData,MinPerBatch)
+  MET_Data_Cancer7=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer7,BatchData,MinPerBatch)
+  MET_Data_Cancer8=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer8,BatchData,MinPerBatch)
   
   if (length(MET_Data_Normal1)>0) {
       cat("\tBatch correction for the normal samples.\n")
-      #MET_Data_Normal1=TCGA_BatchCorrection_MolecularData(MET_Data_Normal1,BatchData,2)
-      #MET_Data_Normal2=TCGA_BatchCorrection_MolecularData(MET_Data_Normal2,BatchData,2)
-      #MET_Data_Normal3=TCGA_BatchCorrection_MolecularData(MET_Data_Normal3,BatchData,2)
-      #MET_Data_Normal4=TCGA_BatchCorrection_MolecularData(MET_Data_Normal4,BatchData,2)
+      MET_Data_Normal1=TCGA_BatchCorrection_MolecularData(MET_Data_Normal1,BatchData,2)
+      MET_Data_Normal2=TCGA_BatchCorrection_MolecularData(MET_Data_Normal2,BatchData,2)
+      MET_Data_Normal3=TCGA_BatchCorrection_MolecularData(MET_Data_Normal3,BatchData,2)
+      MET_Data_Normal4=TCGA_BatchCorrection_MolecularData(MET_Data_Normal4,BatchData,2)
   }
   
   # Combine batch corrected data
@@ -851,7 +855,7 @@ TCGA_GENERIC_GetSampleGroups <-function(SampleNames) {
 #' @return data matrix with cleaned sample names.
 #' @keywords internal
 #'
-TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 12) {
+TCGA_GENERIC_CleanUpSampleNames <-function(GEN_Data, IDlength = 15) {
   SampleNames=colnames(GEN_Data)
   SampleNamesShort=as.character(apply(as.matrix(SampleNames),2,substr,1,IDlength))
   
@@ -1195,7 +1199,7 @@ Preprocess_MAdata_Cancer <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
     MA_TCGA=MA_TCGA[,Samplegroups$Primary,drop=F]
   }          
   cat("\tBatch correction.\n")
-  #MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
+  MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
   
   cat("\tProcessing gene ids and merging.\n")
   Genes=rownames(MA_TCGA)
@@ -1234,7 +1238,7 @@ Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
     MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal,drop=F]
   }          
   cat("\tBatch correction.\n")
-  #MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
+  MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
   
   cat("\tProcessing gene ids and merging.\n")
   Genes=rownames(MA_TCGA)
