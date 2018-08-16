@@ -55,7 +55,9 @@ GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
     cat("Downloading methylation and gene expression MAE object for:", 
         cancerSite, "\n")
     MAEO <- Download_Data(cancerSite)
-    
+
+    # Extract assays in the future, more modular
+
     # Methylation
     cat("Processing methylation data for:", cancerSite, "\n")
     METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
@@ -167,7 +169,6 @@ Pull_Probe_Annotation <- function(MAEO) {
 #' @param TargetDirectory character with directory where a folder for downloaded files will be created.
 #' @param downloadData logical indicating if data should be downloaded (default: TRUE). If false, the url of the desired data is returned.
 #' @return list with paths to downloaded files for both 27k and 450k methylation data.
-#' @export
 #' @keywords download
 #' @examples 
 #' \dontrun{
@@ -456,18 +457,34 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
   #
   #extract 27k and 450k, need more generic way
   query1 <- grep("methyl27", names(experiments(MAEO)))
-  MAEO_27k <- assay(MAEO[[query1]])
-  MAEO_27k <- as.matrix(MAEO_27k)
-  rws <- rownames(MAEO_27k)
-  MAEO_27k <- apply(MAEO_27k, 2, as.numeric)
-  rownames(MAEO_27k) <- rws
-
   query2 <- grep("methyl450", names(experiments(MAEO)))
-  MAEO_450k <- assay(MAEO[[query2]])
-  MAEO_450k <- as.matrix(MAEO_450k)
-  rws <- rownames(MAEO_450k)
-  MAEO_450k <- apply(MAEO_450k, 2, as.numeric)
-  rownames(MAEO_450k) <- rws
+
+  if (length(query1) == 0 || length(query2) == 0) {
+    query <- grep("Methylation", names(experiments(MAEO)))
+    if (nrow(assay(MAEO[[query]])) > 450000) {
+      #interpreting methylation array is only 450k
+      MAEO_27k <- NULL
+      MAEO_450k <- assay(MAEO[[query]])
+    }
+  } else {
+    MAEO_27k <- assay(MAEO[[query1]])
+    MAEO_450k <- assay(MAEO[[query2]])
+  }
+
+  if (!is.null(MAEO_27k)) {
+    MAEO_27k <- as.matrix(MAEO_27k)
+    rws <- rownames(MAEO_27k)
+    MAEO_27k <- apply(MAEO_27k, 2, as.numeric)
+    rownames(MAEO_27k) <- rws
+  }
+
+  if (!is.null(MAEO_450k)) {
+    MAEO_450k <- as.matrix(MAEO_450k)
+    rws <- rownames(MAEO_450k)
+    MAEO_450k <- apply(MAEO_450k, 2, as.numeric)
+    rownames(MAEO_450k) <- rws
+  }
+  #
   ################################
 
   cat("\tProcessing data for",CancerSite,"\n")
@@ -497,12 +514,12 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
       # print size and type of each here
       OverlapSamplesCancer=intersect(colnames(ProcessedData27k$MET_Data_Cancer),colnames(ProcessedData450k$MET_Data_Cancer))
       if (length(OverlapSamplesCancer)>0) {
-        cat("\tCancer sample overlap is not empty: ",length(OverlapSamplesCancer))
+        cat("\tCancer sample overlap is not empty: ",length(OverlapSamplesCancer),'\n')
         ProcessedData27k$MET_Data_Cancer=ProcessedData27k$MET_Data_Cancer[,!colnames(ProcessedData27k$MET_Data_Cancer) %in% OverlapSamplesCancer,drop=FALSE]
       }
       OverlapSamplesNormal=intersect(colnames(ProcessedData27k$MET_Data_Normal),colnames(ProcessedData450k$MET_Data_Normal))
       if (length(OverlapSamplesNormal)>0) {
-        cat("\tNormal sample overlap is not empty: ",length(OverlapSamplesNormal))
+        cat("\tNormal sample overlap is not empty: ",length(OverlapSamplesNormal),'\n')
         ProcessedData27k$MET_Data_Normal=ProcessedData27k$MET_Data_Normal[,!colnames(ProcessedData450k$MET_Data_Normal) %in% OverlapSamplesNormal,drop=FALSE]
       }
           
@@ -560,24 +577,29 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
 
   if (FALSE) {
     #Good spot to run FASTEWASHER thing
+
     # build matrix of both cancer and normal
-    excludedRows1 <- setdiff(rownames(METProcessedData$MET_Data_Cancer), rownames(METProcessedData$MET_Data_Normal))
-    excludedRows2 <- setdiff(rownames(METProcessedData$MET_Data_Normal), rownames(METProcessedData$MET_Data_Cancer))
-    excludedRows <- c(excludedRows1, excludedRows2)
-    indexes1 <- !row.names(METProcessedData$MET_Data_Cancer) %in% excludedRows
-    indexes2 <- !row.names(METProcessedData$MET_Data_Normal) %in% excludedRows
+    if (!is.null(ProcessedData$MET_Data_Normal)) {
+      ewasherData <- cbind(ProcessedData$MET_Data_Cancer,ProcessedData$MET_Data_Normal)
+    } else {
+      excludedRows1 <- setdiff(rownames(ProcessedData$MET_Data_Cancer), rownames(ProcessedData$MET_Data_Normal))
+      excludedRows2 <- setdiff(rownames(ProcessedData$MET_Data_Normal), rownames(ProcessedData$MET_Data_Cancer))
+      excludedRows <- c(excludedRows1, excludedRows2)
+      indexes1 <- !row.names(ProcessedData$MET_Data_Cancer) %in% excludedRows
+      indexes2 <- !row.names(ProcessedData$MET_Data_Normal) %in% excludedRows
+      ewasherData <- cbind(ProcessedData$MET_Data_Cancer[indexes1,],ProcessedData$MET_Data_Normal[indexes2,])
+    }
+    
 
-    ewasherData <- cbind(METProcessedData$MET_Data_Cancer[indexes1,],METProcessedData$MET_Data_Normal[indexes2,])
-    # build value table of cancer and normal sample name and val
-    ewasherPheno <- colnames(ewasherData)
-    phenoVals <- c(rep(0,length(colnames(METProcessedData$MET_Data_Cancer[indexes1,]))),rep(1,length(colnames(METProcessedData$MET_Data_Normal[indexes2,]))))
-    ewasherPheno <- cbind(ewasherPheno, phenoVals)
-    # write both to temp files
-    write.table(ewasherData, file="ewasherData.tsv", sep='\t', quote=FALSE, col.names=NA, row.names=TRUE)
-    write.table(ewasherPheno, file="ewasherPheno.tsv", sep='\t', quote=FALSE, col.names=FALSE, row.names=FALSE)
-    # run ewasher
+    # special write.table to include 1,1 corner "ID"
+    write.table(data.frame("ID"=rownames(ewasherData),ewasherData),"ewasherData.tsv", sep='\t', quote=FALSE, row.names=FALSE)
 
-    # delete temp files
+    source("MethylMix/R/refactor.R")
+    k=5
+    datafile = "ewasherData.tsv"
+    results <- refactor(datafile,k)
+    RC <- results$refactor_components # Extract the ReFACTor components
+    ranked_list <- results$ranked_list # Extract the list of sites ranked by ReFACTor
   }
 
   return(ProcessedData=ProcessedData)
@@ -1058,7 +1080,6 @@ TCGA_GENERIC_BatchCorrection <-function(GEN_Data,BatchData) {
 #' @return list with paths to downloaded files for both 27k and 450k methylation data.
 #' @details This function downloads RNAseq data (file tag "mRNAseq_Preprocess.Level_3"), with the exception for OV and GBM, for which micro array data is
 #' downloaded since there is not enough RNAseq data
-#' @export
 #' @keywords download
 #' @examples 
 #' \dontrun{
@@ -1157,7 +1178,7 @@ Preprocess_GeneExpression <- function(CancerSite,MAEO,MissingValueThresholdGene=
   query3 <- grep("RNASeq", names(experiments(MAEO)))
   MAEO_ge <- as.matrix(assay(MAEO[[query3]]))
   MAEO_ge <- apply(MAEO_ge, 2, log2)
-  MAEO_ge[is.infinite(MAEO_ge) & MAEO_ge<0] <- 0
+  MAEO_ge[is.infinite(MAEO_ge) & MAEO_ge<0] <- NA
   ################################
 
   get("BatchData")
@@ -1170,6 +1191,10 @@ Preprocess_GeneExpression <- function(CancerSite,MAEO,MissingValueThresholdGene=
   MA_TCGA_Cancer=Preprocess_MAdata_Cancer(CancerSite,MAEO_ge,MissingValueThresholdGene,MissingValueThresholdSample)
   MA_TCGA_Normal=Preprocess_MAdata_Normal(CancerSite,MAEO_ge,MissingValueThresholdGene,MissingValueThresholdSample)               
   cat("There are",length(colnames(MA_TCGA_Cancer)),"cancer samples and",length(colnames(MA_TCGA_Normal)),"normal samples in",CancerSite,"\n")
+
+  #format the GE samples
+  colnames(MA_TCGA_Cancer) <- colnames(TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Cancer, IDlength=12))
+  colnames(MA_TCGA_Normal) <- colnames(TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Normal, IDlength=12))
 
   return(list(GEcancer = MA_TCGA_Cancer, GEnormal = MA_TCGA_Normal))
 }
@@ -1230,7 +1255,6 @@ Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
   cat("\tMissing value estimation.\n")
   MA_TCGA=TCGA_Load_MolecularData(MAEO_ge, MissingValueThresholdGene, MissingValueThresholdSample)        
   Samplegroups=TCGA_GENERIC_GetSampleGroups(colnames(MA_TCGA))
-  cat("Broken")       
   if (CancerSite =='LAML') {
     MA_TCGA=MA_TCGA[,Samplegroups$BloodNormal,drop=F]
   } else {
