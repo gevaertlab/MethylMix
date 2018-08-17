@@ -1194,7 +1194,9 @@ Preprocess_GeneExpression <- function(CancerSite,MAEO,MissingValueThresholdGene=
 
   #format the GE samples
   colnames(MA_TCGA_Cancer) <- colnames(TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Cancer, IDlength=12))
-  colnames(MA_TCGA_Normal) <- colnames(TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Normal, IDlength=12))
+  if (!is.null(MA_TCGA_Normal)) {
+    colnames(MA_TCGA_Normal) <- colnames(TCGA_GENERIC_CleanUpSampleNames(MA_TCGA_Normal, IDlength=12))
+  }
 
   return(list(GEcancer = MA_TCGA_Cancer, GEnormal = MA_TCGA_Normal))
 }
@@ -1258,10 +1260,15 @@ Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
   if (CancerSite =='LAML') {
     MA_TCGA=MA_TCGA[,Samplegroups$BloodNormal,drop=F]
   } else {
-    # MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal]
     MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal,drop=F]
+    if (ncol(MA_TCGA) == 0) {
+      MA_TCGA=NULL
+      return(MA_TCGA)
+    }
   }          
   cat("\tBatch correction.\n")
+  cat("Any NA/inf/zero?:")
+  cat(paste0(any(is.na(MA_TCGA)),",",any(is.infinite(MA_TCGA) & MA_TCGA<0 ),",",any(MA_TCGA==0.0)))
   MA_TCGA=TCGA_BatchCorrection_MolecularData(MA_TCGA,BatchData,MinPerBatch)
   
   cat("\tProcessing gene ids and merging.\n")
