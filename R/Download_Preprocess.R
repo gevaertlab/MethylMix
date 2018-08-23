@@ -652,6 +652,9 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, MAEO_27k, MissingVa
   }
     
   # Batch correction for cancer and normal. 
+  #debug line, remove later
+  cat("Any NA/inf/zero?:")
+  cat(paste0(any(is.na(MET_Data)),",",any(is.infinite(MET_DATA) & MET_Data<0 ),",",any(MET_Data==0.0)))
   cat("\tBatch correction for the cancer samples.\n")
   BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Cancer,BatchData)
   MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
@@ -750,6 +753,10 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, MAEO_450k, Missing
   } else {
     MET_Data_Normal1=c()
   }
+  
+  #debug line, remove later
+  cat("Any NA/inf/zero?:")
+  cat(paste0(any(is.na(MET_Data)),",",any(is.infinite(MET_DATA) & MET_Data<0 ),",",any(MET_Data==0.0)))
   
   cat("\tBatch correction for the cancer samples.\n")
   MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
@@ -1263,7 +1270,7 @@ Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
     MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal,drop=F]
     if (ncol(MA_TCGA) == 0) {
       MA_TCGA=NULL
-      return(MA_TCGA)
+      return(MA_TCGA
     }
   }          
   cat("\tBatch correction.\n")
