@@ -51,43 +51,43 @@
 #'
 GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
 
-    # Download
-    cat("Downloading methylation and gene expression MAE object for:", 
-        cancerSite, "\n")
-    MAEO <- Download_Data(cancerSite)
+  # Download
+  cat("Downloading methylation and gene expression MAE object for:", 
+      cancerSite, "\n")
+  MAEO <- Download_Data(cancerSite)
 
-    # Extract assays in the future, more modular
+  # Extract assays in the future, more modular
 
-    # Methylation
-    cat("Processing methylation data for:", cancerSite, "\n")
-    METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
-    cat("Saving methylation processed data for:", cancerSite, "\n")
-    saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", 
-            cancerSite, "_Processed.rds"))
-    
-    # Gene expression
-    cat("Processing gene expression data for:", cancerSite, "\n")
-    GEProcessedData <- Preprocess_GeneExpression(cancerSite, MAEO)
-    cat("Saving gene expression processed data for:", cancerSite, "\n")
-    saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", 
-            cancerSite, "_Processed.rds"))
-    
-    # Clustering probes to genes
-    cat("Clustering methylation data for:", cancerSite, "\n")
-    # Below is a method to update probe annotations through the MAEO object, but is not functional
-    #MAEO_Probes <- Pull_Probe_Annotation(MAEO)
-    #res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]],
-    #                     MAEO_Probes=MAEO_Probes)
-    res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
-    
-    # Putting everything together
-    cat("Saving data\n")
-    toSave <- list(METcancer = res[[1]], METnormal = res[[2]], GEcancer = 
-                   GEProcessedData[[1]], GEnormal = GEProcessedData[[2]], 
-                   ProbeMapping = res$ProbeMapping, 
-                   PatientData = colData(MAEO))
-    saveRDS(toSave, file = paste0(targetDirectory, "data_", 
-            cancerSite, ".rds"))
+  # Methylation
+  cat("Processing methylation data for:", cancerSite, "\n")
+  METProcessedData <- Preprocess_DNAmethylation(cancerSite, MAEO)
+  cat("Saving methylation processed data for:", cancerSite, "\n")
+  saveRDS(METProcessedData, file = paste0(targetDirectory, "MET_", 
+          cancerSite, "_Processed.rds"))
+  
+  # Gene expression
+  cat("Processing gene expression data for:", cancerSite, "\n")
+  GEProcessedData <- Preprocess_GeneExpression(cancerSite, MAEO)
+  cat("Saving gene expression processed data for:", cancerSite, "\n")
+  saveRDS(GEProcessedData, file = paste0(targetDirectory, "GE_", 
+          cancerSite, "_Processed.rds"))
+  
+  # Clustering probes to genes
+  cat("Clustering methylation data for:", cancerSite, "\n")
+  # Below is a method to update probe annotations through the MAEO object, but is not functional
+  #MAEO_Probes <- Pull_Probe_Annotation(MAEO)
+  #res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]],
+  #                     MAEO_Probes=MAEO_Probes)
+  res <- ClusterProbes(METProcessedData[[1]], METProcessedData[[2]])
+  
+  # Putting everything together
+  cat("Saving data\n")
+  toSave <- list(METcancer = res[[1]], METnormal = res[[2]], GEcancer = 
+                 GEProcessedData[[1]], GEnormal = GEProcessedData[[2]], 
+                 ProbeMapping = res$ProbeMapping, 
+                 PatientData = colData(MAEO))
+  saveRDS(toSave, file = paste0(targetDirectory, "data_", 
+          cancerSite, ".rds"))
 }
 
 #' The Download_Data function
@@ -117,13 +117,13 @@ GetData <- function(cancerSite, targetDirectory=paste0(getwd(),"/")) {
 #'  
 Download_Data <- function(cancerSite) {
 
-    #add methylation, let's try all RSEM - test this, if it works then do away with this function
-    assays <- c("Methylation", "RNASeq2GeneNorm")
+  #add methylation, let's try all RSEM - test this, if it works then do away with this function
+  assays <- c("Methylation", "RNASeq2GeneNorm")
 
-    #run the query
-    MAEO <- curatedTCGAData::curatedTCGAData(cancerSite, assays, FALSE)
+  #run the query
+  MAEO <- curatedTCGAData::curatedTCGAData(cancerSite, assays, FALSE)
 
-    return(MAEO)
+  return(MAEO)
 }
 
 #' The Pull_Probe_Annotation function
@@ -145,20 +145,20 @@ Download_Data <- function(cancerSite) {
 #' }
 #'  
 Pull_Probe_Annotation <- function(MAEO) {
-    #expects MAE object with 27k and 450k methylation data
-    probes <- as.matrix(SummarizedExperiment::rowData(MAEO[[1]])[,1])
-    probes2 <- as.matrix(SummarizedExperiment::rowData(MAEO[[2]])[,1])
-    rownames(probes) <- as.character(rownames(MAEO[[1]]))
-    rownames(probes2) <- as.character(rownames(MAEO[[2]]))
+  #expects MAE object with 27k and 450k methylation data
+  probes <- as.matrix(SummarizedExperiment::rowData(MAEO[[1]])[,1])
+  probes2 <- as.matrix(SummarizedExperiment::rowData(MAEO[[2]])[,1])
+  rownames(probes) <- as.character(rownames(MAEO[[1]]))
+  rownames(probes2) <- as.character(rownames(MAEO[[2]]))
 
-    probes <- cbind(rownames(MAEO[[1]]),SummarizedExperiment::rowData(MAEO[[1]])[,1])
-    probes2 <- cbind(rownames(MAEO[[2]]),SummarizedExperiment::rowData(MAEO[[2]])[,1])
-    probes_all <- data.frame(rbind(probes,probes2), stringsAsFactors=FALSE)
+  probes <- cbind(rownames(MAEO[[1]]),SummarizedExperiment::rowData(MAEO[[1]])[,1])
+  probes2 <- cbind(rownames(MAEO[[2]]),SummarizedExperiment::rowData(MAEO[[2]])[,1])
+  probes_all <- data.frame(rbind(probes,probes2), stringsAsFactors=FALSE)
 
-    colnames(probes_all) <- c("ILMNID", "GENESYMBOL")
-    probes_all <- na.omit(probes_all)
+  colnames(probes_all) <- c("ILMNID", "GENESYMBOL")
+  probes_all <- na.omit(probes_all)
 
-    return(data.frame(probes_all))
+  return(data.frame(probes_all))
 }
 
 #' The Download_DNAmethylation function
@@ -203,23 +203,23 @@ Download_DNAmethylation <- function(CancerSite,
                                     TargetDirectory, 
                                     downloadData = TRUE) {  
 
-    .Deprecated("Download_Data")
-    ## use Download_Data() in order to download assays as of 2.12.0
-    
-    dir.create(TargetDirectory,showWarnings=FALSE)
-    
-    # download the 27k data
-    dataType='stddata'
-    dataFileTag='Merge_methylation__humanmethylation27'
-    cat('Searching 27k MET data for:',CancerSite,'\n')
-    METdirectory27k=get_firehoseData(downloadData,TargetDirectory,CancerSite,dataType,dataFileTag)
-    
-    # download the 450k data
-    dataFileTag='Merge_methylation__humanmethylation450'
-    cat('Searching 450k MET data for:',CancerSite,'\n')
-    METdirectory450k=get_firehoseData(downloadData,TargetDirectory,CancerSite,dataType,dataFileTag)
-    
-    return(METdirectories=list(METdirectory27k=METdirectory27k,METdirectory450k=METdirectory450k))
+  .Deprecated("Download_Data")
+  ## use Download_Data() in order to download assays as of 2.12.0
+  
+  dir.create(TargetDirectory,showWarnings=FALSE)
+  
+  # download the 27k data
+  dataType='stddata'
+  dataFileTag='Merge_methylation__humanmethylation27'
+  cat('Searching 27k MET data for:',CancerSite,'\n')
+  METdirectory27k=get_firehoseData(downloadData,TargetDirectory,CancerSite,dataType,dataFileTag)
+  
+  # download the 450k data
+  dataFileTag='Merge_methylation__humanmethylation450'
+  cat('Searching 450k MET data for:',CancerSite,'\n')
+  METdirectory450k=get_firehoseData(downloadData,TargetDirectory,CancerSite,dataType,dataFileTag)
+  
+  return(METdirectories=list(METdirectory27k=METdirectory27k,METdirectory450k=METdirectory450k))
 }
 
 #' The get_firehoseData function
@@ -590,7 +590,6 @@ Preprocess_DNAmethylation <- function(CancerSite, MAEO, MissingValueThreshold = 
       ewasherData <- cbind(ProcessedData$MET_Data_Cancer[indexes1,],ProcessedData$MET_Data_Normal[indexes2,])
     }
     
-
     # special write.table to include 1,1 corner "ID"
     write.table(data.frame("ID"=rownames(ewasherData),ewasherData),"ewasherData.tsv", sep='\t', quote=FALSE, row.names=FALSE)
 
@@ -654,7 +653,9 @@ Preprocess_CancerSite_Methylation27k <- function(CancerSite, MAEO_27k, MissingVa
   # Batch correction for cancer and normal. 
   #debug line, remove later
   cat("Any NA/inf/zero?:")
-  cat(paste0(any(is.na(MET_Data)),",",any(is.infinite(MET_DATA) & MET_Data<0 ),",",any(MET_Data==0.0)))
+  cat(paste0(any(is.na(MET_Data_Cancer)),",",any(is.infinite(MET_Data_Cancer) & MET_Data_Cancer<0 ),",",any(MET_Data_Cancer==0.0)))
+  cat("Any NA/inf/zero?:")
+  cat(paste0(any(is.na(MET_Data_Normal)),",",any(is.infinite(MET_Data_Normal) & MET_Data_Normal<0 ),",",any(MET_Data_Normal==0.0)))
   cat("\tBatch correction for the cancer samples.\n")
   BatchEffectCheck=TCGA_GENERIC_CheckBatchEffect(MET_Data_Cancer,BatchData)
   MET_Data_Cancer=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer,BatchData,MinPerBatch)
@@ -754,10 +755,11 @@ Preprocess_CancerSite_Methylation450k <- function(CancerSite, MAEO_450k, Missing
     MET_Data_Normal1=c()
   }
   
-  #debug line, remove later
   cat("Any NA/inf/zero?:")
-  cat(paste0(any(is.na(MET_Data)),",",any(is.infinite(MET_DATA) & MET_Data<0 ),",",any(MET_Data==0.0)))
-  
+  cat(paste0(any(is.na(MET_Data_Cancer)),",",any(is.infinite(MET_Data_Cancer) & MET_Data_Cancer<0 ),",",any(MET_Data_Cancer==0.0)))
+  cat("Any NA/inf/zero?:")
+  cat(paste0(any(is.na(MET_Data_Normal)),",",any(is.infinite(MET_Data_Normal) & MET_Data_Normal<0 ),",",any(MET_Data_Normal==0.0)))
+
   cat("\tBatch correction for the cancer samples.\n")
   MET_Data_Cancer1=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer1,BatchData,MinPerBatch)
   MET_Data_Cancer2=TCGA_BatchCorrection_MolecularData(MET_Data_Cancer2,BatchData,MinPerBatch)
@@ -1270,7 +1272,7 @@ Preprocess_MAdata_Normal <- function(CancerSite,MAEO_ge,MissingValueThresholdGen
     MA_TCGA=MA_TCGA[,Samplegroups$SolidNormal,drop=F]
     if (ncol(MA_TCGA) == 0) {
       MA_TCGA=NULL
-      return(MA_TCGA
+      return(MA_TCGA)
     }
   }          
   cat("\tBatch correction.\n")
