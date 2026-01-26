@@ -18,7 +18,7 @@ License: GPL-2
 Encoding: UTF-8
 LazyData: true
 Author: Olivier Gevaert
-Maintainer: Olivier Gevaert <olivier.gevaert@gmail.com>
+Maintainer: Olivier Gevaert <ogevaert@stanford.edu>
 Type: Package
 Date: 2018-07-13
 Imports: foreach, RPMM, RColorBrewer, ggplot2, RCurl, impute, data.table, limma, R.matlab, digest
@@ -29,3 +29,4 @@ Suggests: BiocStyle, doParallel,
 biocViews: DNAMethylation,StatisticalMethod,DifferentialMethylation,GeneRegulation,GeneExpression,MethylationArray,DifferentialExpression,Pathways,Network
 RoxygenNote: 6.0.1
 VignetteBuilder: knitr
+
